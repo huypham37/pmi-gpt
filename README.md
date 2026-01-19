@@ -145,6 +145,8 @@ bun run typecheck:all
 OAuth integrations (Google, Slack, Microsoft) require credentials. Create a `.env` file:
 
 ```bash
+MICROSOFT_OAUTH_CLIENT_ID=your-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
 SLACK_OAUTH_CLIENT_ID=your-slack-client-id
 SLACK_OAUTH_CLIENT_SECRET=your-slack-client-secret
