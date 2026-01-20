@@ -974,6 +974,8 @@ html.dark[data-scenic] .fullscreen-overlay-background {
   box-shadow: var(--shadow-modal-small) !important;
   background-color: oklch(from var(--popover) l c h / 0.8) !important;
   -webkit-app-region: no-drag !important;
+  /* Fixed width to ensure text truncation works */
+  width: 356px !important;
 }
 
 /* Hide icon container to remove leftover padding */
@@ -987,6 +989,14 @@ html.dark[data-scenic] .fullscreen-overlay-background {
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
+  /* Required for text truncation in flex containers */
+  min-width: 0 !important;
+}
+
+/* Ensure content area doesn't overflow toast bounds */
+[data-sonner-toast] [data-content] {
+  min-width: 0 !important;
+  overflow: hidden !important;
 }
 
 /* Description (subtitle) at 70% opacity */

@@ -1,24 +1,25 @@
 /**
- * FullscreenOverlay - Fullscreen view for reading AI responses
+ * DocumentFormattedMarkdownOverlay - Fullscreen view for reading AI responses and plans
  *
- * Z-Index: Uses z-fullscreen (350) from the electron app's z-index registry.
- * Falls back to 350 when CSS variable is not available.
- * See: apps/electron/src/renderer/index.css for the full z-index scale.
+ * Renders markdown content in a document-like format with:
+ * - Centered content card with max-width
+ * - Copy button for content
+ * - Optional "Plan" header variant
+ * - Scenic mode blur support via CSS class
+ *
+ * Uses FullscreenOverlayBase for portal, traffic lights, and ESC handling.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import ReactDOM from 'react-dom'
+import { useState, useCallback } from 'react'
 import { Check, Copy, ListTodo, X } from 'lucide-react'
-import { cn } from '../../../lib/utils'
-import { Markdown } from '../../markdown'
-import { usePlatform } from '../../../context/PlatformContext'
+import { cn } from '../../lib/utils'
+import { Markdown } from '../markdown'
+import { FullscreenOverlayBase } from './FullscreenOverlayBase'
 
-// Z-index for fullscreen overlays - must be above app chrome (z-overlay: 300)
-// Uses CSS variable when available, falls back to hardcoded value
-const Z_FULLSCREEN = 'var(--z-fullscreen, 350)'
+// Z-index for header buttons - matches base overlay z-index
 const Z_FULLSCREEN_HEADER = 'var(--z-fullscreen, 350)'
 
-export interface FullscreenOverlayProps {
+export interface DocumentFormattedMarkdownOverlayProps {
   /** The content to display (markdown) */
   content: string
   /** Whether the overlay is open */
@@ -33,39 +34,16 @@ export interface FullscreenOverlayProps {
   onOpenFile?: (path: string) => void
 }
 
-export function FullscreenOverlay({
+export function DocumentFormattedMarkdownOverlay({
   content,
   isOpen,
   onClose,
   variant = 'response',
   onOpenUrl,
   onOpenFile,
-}: FullscreenOverlayProps) {
+}: DocumentFormattedMarkdownOverlayProps) {
   // Copy state
   const [copied, setCopied] = useState(false)
-  const { onSetTrafficLightsVisible } = usePlatform()
-
-  // Hide macOS traffic lights when overlay opens, restore when it closes
-  useEffect(() => {
-    if (!isOpen) return
-
-    onSetTrafficLightsVisible?.(false)
-    return () => onSetTrafficLightsVisible?.(true)
-  }, [isOpen, onSetTrafficLightsVisible])
-
-  // Handle escape key
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
 
   // Copy handler
   const handleCopy = useCallback(async () => {
@@ -78,12 +56,11 @@ export function FullscreenOverlay({
     }
   }, [content])
 
-  if (!isOpen) return null
-
-  return ReactDOM.createPortal(
-    <div
-      className="fixed inset-0 flex flex-col"
-      style={{ zIndex: Z_FULLSCREEN }}
+  return (
+    <FullscreenOverlayBase
+      isOpen={isOpen}
+      onClose={onClose}
+      className="flex flex-col"
     >
       {/* Fixed header buttons */}
       <div
@@ -147,7 +124,6 @@ export function FullscreenOverlay({
           </div>
         </div>
       </div>
-    </div>,
-    document.body
+    </FullscreenOverlayBase>
   )
 }

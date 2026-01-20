@@ -181,7 +181,15 @@ export interface GenericOverlayData {
   title: string
 }
 
-export type OverlayData = CodeOverlayData | DiffOverlayData | TerminalOverlayData | GenericOverlayData
+export interface JSONOverlayData {
+  type: 'json'
+  data: unknown
+  rawContent: string
+  title: string
+  error?: string
+}
+
+export type OverlayData = CodeOverlayData | DiffOverlayData | TerminalOverlayData | GenericOverlayData | JSONOverlayData
 
 // ============================================================================
 // Main Extraction Function
@@ -280,7 +288,26 @@ export function extractOverlayData(activity: ActivityItem): OverlayData | null {
     }
   }
 
-  // Fallback for unknown tools
+  // Try to detect JSON content for unknown tools (MCP tools, WebSearch, WebFetch, etc.)
+  // JSON objects/arrays get interactive tree viewer, other content falls through to generic
+  const trimmedContent = rawContent.trim()
+  if ((trimmedContent.startsWith('{') && trimmedContent.endsWith('}')) ||
+      (trimmedContent.startsWith('[') && trimmedContent.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmedContent)
+      return {
+        type: 'json',
+        data: parsed,
+        rawContent: trimmedContent,
+        title: activity.displayName || activity.toolName || 'JSON Result',
+        error: activity.error,
+      }
+    } catch {
+      // Not valid JSON, fall through to generic
+    }
+  }
+
+  // Fallback for unknown tools - plain text/markdown content
   return {
     type: 'generic',
     content: rawContent || (input ? JSON.stringify(input, null, 2) : ''),

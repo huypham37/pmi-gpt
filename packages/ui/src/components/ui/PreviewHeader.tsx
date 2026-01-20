@@ -136,8 +136,6 @@ export function PreviewHeader({
       className={cn(
         'shrink-0 flex items-center justify-between px-5 border-b border-foreground/5',
         'backdrop-blur-xl backdrop-saturate-150',
-        // Use bg-background CSS variable which respects the .dark class on <html>
-        'bg-background',
         className
       )}
       style={{ height, ...style }}
@@ -161,6 +159,7 @@ export function PreviewHeader({
               'hover:bg-foreground/5',
               'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring'
             )}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />

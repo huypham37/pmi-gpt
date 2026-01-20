@@ -358,8 +358,9 @@ export function InlineSlashCommand({
   }, [onSelectCommand, onSelectFolder, onOpenChange])
 
   // Keyboard navigation
+  // Don't attach listener when no items - allows Enter to propagate to input handler
   React.useEffect(() => {
-    if (!open) return
+    if (!open || flatItems.length === 0) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {

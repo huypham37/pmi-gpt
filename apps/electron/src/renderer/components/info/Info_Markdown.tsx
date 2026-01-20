@@ -3,14 +3,14 @@
  *
  * Markdown content with consistent styling and heading detection.
  * Auto-adjusts top padding based on whether content starts with a heading.
- * Supports optional fullscreen view using the shared FullscreenOverlay component.
+ * Supports optional fullscreen view using the shared DocumentFormattedMarkdownOverlay component.
  */
 
 import * as React from 'react'
 import { useState } from 'react'
 import { Maximize2 } from 'lucide-react'
 import { Markdown } from '@/components/markdown'
-import { FullscreenOverlay } from '@craft-agent/ui'
+import { DocumentFormattedMarkdownOverlay } from '@craft-agent/ui'
 import { cn } from '@/lib/utils'
 
 export interface Info_MarkdownProps {
@@ -72,7 +72,7 @@ export function Info_Markdown({
 
       {/* Fullscreen overlay - reuses shared component from packages/ui */}
       {fullscreen && (
-        <FullscreenOverlay
+        <DocumentFormattedMarkdownOverlay
           content={children}
           isOpen={isFullscreen}
           onClose={() => setIsFullscreen(false)}

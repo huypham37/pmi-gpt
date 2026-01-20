@@ -35,7 +35,6 @@ export {
   SystemMessage,
   FileTypeIcon,
   getFileTypeLabel,
-  FullscreenOverlay,
   type SessionViewerProps,
   type SessionViewerMode,
   type TurnCardProps,
@@ -45,7 +44,6 @@ export {
   type SystemMessageProps,
   type SystemMessageType,
   type FileTypeIconProps,
-  type FullscreenOverlayProps,
   type ActivityItem,
   type ResponseContent,
   type TodoItem,
@@ -107,9 +105,11 @@ export {
 
 // Overlay components
 export {
-  // Base overlay
+  // Base overlay components
+  FullscreenOverlayBase,
   PreviewOverlay,
   CopyButton,
+  type FullscreenOverlayBaseProps,
   type PreviewOverlayProps,
   type BadgeVariant,
   type CopyButtonProps,
@@ -119,7 +119,9 @@ export {
   MultiDiffPreviewOverlay,
   TerminalPreviewOverlay,
   GenericOverlay,
+  JSONPreviewOverlay,
   DataTableOverlay,
+  DocumentFormattedMarkdownOverlay,
   detectLanguageFromPath,
   type CodePreviewOverlayProps,
   type DiffPreviewOverlayProps,
@@ -127,7 +129,9 @@ export {
   type FileChange,
   type TerminalPreviewOverlayProps,
   type GenericOverlayProps,
+  type JSONPreviewOverlayProps,
   type DataTableOverlayProps,
+  type DocumentFormattedMarkdownOverlayProps,
 } from './components/overlay'
 
 // Utilities
@@ -157,6 +161,7 @@ export {
   type DiffOverlayData,
   type TerminalOverlayData,
   type GenericOverlayData,
+  type JSONOverlayData,
   type OverlayData,
 } from './lib/tool-parsers'
 

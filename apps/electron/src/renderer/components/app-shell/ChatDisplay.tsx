@@ -28,6 +28,7 @@ import {
   MultiDiffPreviewOverlay,
   TerminalPreviewOverlay,
   GenericOverlay,
+  JSONPreviewOverlay,
   type ActivityItem,
   type OverlayData,
   type FileChange,
@@ -952,6 +953,18 @@ export function ChatDisplay({
           toolType={overlayData.toolType}
           description={overlayData.description}
           theme={isDark ? 'dark' : 'light'}
+        />
+      )}
+
+      {/* JSON preview overlay (MCP tools, WebSearch, etc.) */}
+      {overlayData?.type === 'json' && (
+        <JSONPreviewOverlay
+          isOpen={!!overlayState}
+          onClose={handleCloseOverlay}
+          data={overlayData.data}
+          title={overlayData.title}
+          theme={isDark ? 'dark' : 'light'}
+          error={overlayData.error}
         />
       )}
 

@@ -1,6 +1,6 @@
 import type { ComponentEntry } from './types'
 import { useState, useEffect, type ReactNode } from 'react'
-import { TurnCard, FullscreenOverlay, type ActivityItem, type ResponseContent, type TodoItem } from '@craft-agent/ui'
+import { TurnCard, DocumentFormattedMarkdownOverlay, type ActivityItem, type ResponseContent, type TodoItem } from '@craft-agent/ui'
 
 /** Wrapper with padding for playground preview */
 function PaddedWrapper({ children }: { children: ReactNode }) {
@@ -1115,7 +1115,7 @@ After implementation, we'll need to:
 Estimated completion: 3-4 days`
 
 /** Wrapper that provides controlled open state for playground */
-function FullscreenOverlayPlayground({
+function DocumentFormattedMarkdownOverlayPlayground({
   content,
   variant,
 }: {
@@ -1130,9 +1130,9 @@ function FullscreenOverlayPlayground({
         onClick={() => setIsOpen(true)}
         className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90"
       >
-        Open Fullscreen Overlay
+        Open Document Overlay
       </button>
-      <FullscreenOverlay
+      <DocumentFormattedMarkdownOverlay
         content={content}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
@@ -1144,14 +1144,14 @@ function FullscreenOverlayPlayground({
   )
 }
 
-/** Export fullscreen overlay components */
+/** Export document overlay components */
 export const fullscreenOverlayComponents: ComponentEntry[] = [
   {
-    id: 'fullscreen-overlay',
-    name: 'FullscreenOverlay',
+    id: 'document-overlay',
+    name: 'DocumentFormattedMarkdownOverlay',
     category: 'Fullscreen',
-    description: 'Fullscreen view for reading AI responses and plans',
-    component: FullscreenOverlayPlayground,
+    description: 'Fullscreen document view for reading AI responses and plans',
+    component: DocumentFormattedMarkdownOverlayPlayground,
     layout: 'top',
     props: [
       {

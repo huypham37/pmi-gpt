@@ -23,7 +23,7 @@ import { Markdown } from '../markdown'
 import { Spinner } from '../ui/LoadingIndicator'
 import { TurnCardActionsMenu } from './TurnCardActionsMenu'
 import { computeLastChildSet, groupActivitiesByParent, isActivityGroup, formatDuration, formatTokens, deriveTurnPhase, shouldShowThinkingIndicator, type ActivityGroup, type AssistantTurn } from './turn-utils'
-import { FullscreenOverlay } from './fullscreen'
+import { DocumentFormattedMarkdownOverlay } from '../overlay'
 import { AcceptPlanDropdown } from './AcceptPlanDropdown'
 
 // ============================================================================
@@ -1086,8 +1086,8 @@ export function ResponseCard({
           </div>
         </div>
 
-        {/* Fullscreen overlay */}
-        <FullscreenOverlay
+        {/* Fullscreen overlay for reading response/plan */}
+        <DocumentFormattedMarkdownOverlay
           content={text}
           isOpen={isFullscreen}
           onClose={() => setIsFullscreen(false)}

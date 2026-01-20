@@ -2,7 +2,7 @@
  * PreviewOverlay - Base component for all preview overlays
  *
  * Provides unified presentation logic for modal/fullscreen overlays:
- * - Portal rendering to document.body
+ * - Portal rendering to document.body (via FullscreenOverlayBase for fullscreen mode)
  * - Responsive modal (>=1200px) vs fullscreen (<1200px) modes
  * - Escape key to close
  * - Backdrop click to close (modal mode)
@@ -12,13 +12,12 @@
  * Used by: CodePreviewOverlay, DiffPreviewOverlay, TerminalPreviewOverlay, GenericOverlay
  */
 
-import * as React from 'react'
 import { useEffect, type ReactNode } from 'react'
 import * as ReactDOM from 'react-dom'
 import { X, type LucideIcon } from 'lucide-react'
 import { useOverlayMode, OVERLAY_LAYOUT } from '../../lib/layout'
 import { PreviewHeader, PreviewHeaderBadge, type PreviewBadgeVariant } from '../ui/PreviewHeader'
-import { usePlatform } from '../../context/PlatformContext'
+import { FullscreenOverlayBase } from './FullscreenOverlayBase'
 
 /** Badge color variants - re-export for backwards compatibility */
 export type BadgeVariant = PreviewBadgeVariant
@@ -79,19 +78,10 @@ export function PreviewOverlay({
 }: PreviewOverlayProps) {
   const responsiveMode = useOverlayMode()
   const isModal = responsiveMode === 'modal'
-  const { onSetTrafficLightsVisible } = usePlatform()
 
-  // Hide macOS traffic lights when overlay opens, restore when it closes
+  // Handle Escape key for modal mode only (fullscreen mode uses FullscreenOverlayBase which handles ESC)
   useEffect(() => {
-    if (!isOpen) return
-
-    onSetTrafficLightsVisible?.(false)
-    return () => onSetTrafficLightsVisible?.(true)
-  }, [isOpen, onSetTrafficLightsVisible])
-
-  // Handle Escape key
-  useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !isModal) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -101,7 +91,7 @@ export function PreviewOverlay({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, isModal, onClose])
 
   if (!isOpen) return null
 
@@ -133,24 +123,29 @@ export function PreviewOverlay({
     </div>
   )
 
-  const content = <div className="flex-1 min-h-0">{children}</div>
+  const contentArea = <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{children}</div>
 
-  // Fullscreen mode - covers entire viewport
+  // Fullscreen mode - uses FullscreenOverlayBase for portal, traffic lights, and ESC handling
   if (!isModal) {
-    return ReactDOM.createPortal(
-      <div
-        className="fixed inset-0 z-fullscreen flex flex-col bg-background"
-        style={{ backgroundColor: bgColor, color: txtColor }}
+    return (
+      <FullscreenOverlayBase
+        isOpen={isOpen}
+        onClose={onClose}
+        className="flex flex-col bg-background"
       >
-        {header}
-        {errorBanner}
-        {content}
-      </div>,
-      document.body
+        <div
+          className="flex flex-col flex-1 min-h-0"
+          style={{ backgroundColor: bgColor, color: txtColor }}
+        >
+          {header}
+          {errorBanner}
+          {contentArea}
+        </div>
+      </FullscreenOverlayBase>
     )
   }
 
-  // Modal mode - uses portal to center on viewport
+  // Modal mode - uses its own portal with backdrop click to close
   return ReactDOM.createPortal(
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center ${OVERLAY_LAYOUT.modalBackdropClass}`}
@@ -171,7 +166,7 @@ export function PreviewOverlay({
       >
         {header}
         {errorBanner}
-        {content}
+        {contentArea}
       </div>
     </div>,
     document.body

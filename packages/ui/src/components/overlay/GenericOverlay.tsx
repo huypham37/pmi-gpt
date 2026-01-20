@@ -33,11 +33,18 @@ export interface GenericOverlayProps {
 
 /**
  * Auto-detect language from content patterns.
- * For GenericOverlay (commentary/thinking), we default to markdown
- * since the content is typically natural language text.
+ * Checks for JSON, code blocks, then defaults to markdown.
  */
 function detectLanguage(content: string): string {
-  // Check for code block markers at the start - only case where we override markdown
+  const trimmed = content.trim()
+
+  // Check for JSON - starts with { or [ and looks like valid JSON structure
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    return 'json'
+  }
+
+  // Check for code block markers at the start
   const codeBlockMatch = content.match(/^```(\w+)/)
   if (codeBlockMatch && codeBlockMatch[1]) {
     return codeBlockMatch[1]
@@ -129,7 +136,7 @@ export function GenericOverlay({
       }}
       title={title}
     >
-      <div className="flex-1 min-h-0 overflow-auto p-4">
+      <div className="h-full overflow-auto p-4">
         {diffMode ? (
           // Side-by-side diff view
           <div className="flex gap-4 h-full">
@@ -148,7 +155,8 @@ export function GenericOverlay({
           </div>
         ) : (
           // Single content view
-          <div className="h-full overflow-auto rounded-lg border bg-muted/20 p-4">
+          // Note: No h-full - content grows naturally and outer container scrolls
+          <div className="rounded-lg border bg-muted/20 p-4">
             <CodeBlock code={content} language={detectedLanguage} mode="minimal" />
           </div>
         )}

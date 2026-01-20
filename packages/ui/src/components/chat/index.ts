@@ -15,8 +15,5 @@ export { SystemMessage, type SystemMessageProps, type SystemMessageType } from '
 // Attachment helpers
 export { FileTypeIcon, getFileTypeLabel, type FileTypeIconProps } from './attachment-helpers'
 
-// Fullscreen overlay
-export { FullscreenOverlay, type FullscreenOverlayProps } from './fullscreen'
-
 // Accept plan dropdown (for plan cards)
 export { AcceptPlanDropdown } from './AcceptPlanDropdown'

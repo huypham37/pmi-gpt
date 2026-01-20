@@ -1199,9 +1199,11 @@ export default function App() {
   }
 
   // Reauth state - session expired, need to re-login
+  // ModalProvider + WindowCloseHandler ensures X button works on Windows
   if (appState === 'reauth') {
     return (
-      <>
+      <ModalProvider>
+        <WindowCloseHandler />
         <ReauthScreen
           onLogin={handleReauthLogin}
           onReset={handleReauthReset}
@@ -1211,28 +1213,33 @@ export default function App() {
           onConfirm={executeReset}
           onCancel={() => setShowResetDialog(false)}
         />
-      </>
+      </ModalProvider>
     )
   }
 
   // Onboarding state
+  // ModalProvider + WindowCloseHandler ensures X button works on Windows
+  // (without this, the close IPC message has no listener and window stays open)
   if (appState === 'onboarding') {
     return (
-      <OnboardingWizard
-        state={onboarding.state}
-        onContinue={onboarding.handleContinue}
-        onBack={onboarding.handleBack}
-        onSelectBillingMethod={onboarding.handleSelectBillingMethod}
-        onSubmitCredential={onboarding.handleSubmitCredential}
-        onStartOAuth={onboarding.handleStartOAuth}
-        onFinish={onboarding.handleFinish}
-        existingClaudeToken={onboarding.existingClaudeToken}
-        isClaudeCliInstalled={onboarding.isClaudeCliInstalled}
-        onUseExistingClaudeToken={onboarding.handleUseExistingClaudeToken}
-        isWaitingForCode={onboarding.isWaitingForCode}
-        onSubmitAuthCode={onboarding.handleSubmitAuthCode}
-        onCancelOAuth={onboarding.handleCancelOAuth}
-      />
+      <ModalProvider>
+        <WindowCloseHandler />
+        <OnboardingWizard
+          state={onboarding.state}
+          onContinue={onboarding.handleContinue}
+          onBack={onboarding.handleBack}
+          onSelectBillingMethod={onboarding.handleSelectBillingMethod}
+          onSubmitCredential={onboarding.handleSubmitCredential}
+          onStartOAuth={onboarding.handleStartOAuth}
+          onFinish={onboarding.handleFinish}
+          existingClaudeToken={onboarding.existingClaudeToken}
+          isClaudeCliInstalled={onboarding.isClaudeCliInstalled}
+          onUseExistingClaudeToken={onboarding.handleUseExistingClaudeToken}
+          isWaitingForCode={onboarding.isWaitingForCode}
+          onSubmitAuthCode={onboarding.handleSubmitAuthCode}
+          onCancelOAuth={onboarding.handleCancelOAuth}
+        />
+      </ModalProvider>
     )
   }
 

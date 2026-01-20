@@ -210,7 +210,7 @@ export class SourceServerBuilder {
     // Map auth type
     switch (api.authType) {
       case 'bearer':
-        config.auth = { type: 'bearer', authScheme: api.authScheme || 'Bearer' };
+        config.auth = { type: 'bearer', authScheme: api.authScheme ?? 'Bearer' };
         break;
       case 'header':
         config.auth = { type: 'header', headerName: api.headerName || 'x-api-key' };
