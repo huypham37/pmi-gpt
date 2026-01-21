@@ -687,6 +687,7 @@ export function ChatDisplay({
                       <TurnCard
                         key={`turn-${turn.turnId}`}
                         sessionId={session.id}
+                        sessionFolderPath={session.sessionFolderPath}
                         turnId={turn.turnId}
                         activities={turn.activities}
                         response={turn.response}
@@ -853,7 +854,6 @@ export function ChatDisplay({
               onInsertMessage={onInputChange}
             />
             <InputContainer
-              placeholder={`Message ${session.workspaceName || 'Chat'}...`}
               disabled={isInputDisabled}
               isProcessing={session.isProcessing}
               onSubmit={handleSubmit}

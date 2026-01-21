@@ -18,6 +18,8 @@ import {
   DatabaseZap,
   Zap,
   Inbox,
+  Globe,
+  FolderOpen,
 } from "lucide-react"
 import { PanelRightRounded } from "../icons/PanelRightRounded"
 import { PanelLeftRounded } from "../icons/PanelLeftRounded"
@@ -25,6 +27,7 @@ import { PanelLeftRounded } from "../icons/PanelLeftRounded"
 import { SourceAvatar } from "@/components/ui/source-avatar"
 import { AppMenu } from "../AppMenu"
 import { SquarePenRounded } from "../icons/SquarePenRounded"
+import { McpIcon } from "../icons/McpIcon"
 import { cn, isHexColor } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { HeaderIconButton } from "@/components/ui/HeaderIconButton"
@@ -66,7 +69,7 @@ import { useFocusZone, useGlobalShortcuts } from "@/hooks/keyboard"
 import { useFocusContext } from "@/context/FocusContext"
 import { getSessionTitle } from "@/utils/session"
 import { useSetAtom } from "jotai"
-import type { Session, Workspace, FileAttachment, PermissionRequest, TodoState, LoadedSource, LoadedSkill, PermissionMode } from "../../../shared/types"
+import type { Session, Workspace, FileAttachment, PermissionRequest, TodoState, LoadedSource, LoadedSkill, PermissionMode, SourceFilter } from "../../../shared/types"
 import { sessionMetaMapAtom, type SessionMeta } from "@/atoms/sessions"
 import { sourcesAtom } from "@/atoms/sources"
 import { skillsAtom } from "@/atoms/skills"
@@ -230,6 +233,9 @@ function AppShellContent({
 
   // Derive chat filter from navigation state (only when in chats navigator)
   const chatFilter = isChatsNavigation(navState) ? navState.filter : null
+
+  // Derive source filter from navigation state (only when in sources navigator)
+  const sourceFilter: SourceFilter | null = isSourcesNavigation(navState) ? navState.filter ?? null : null
 
   // Session list filter: empty set shows all, otherwise shows only sessions with selected states
   const [listFilter, setListFilter] = React.useState<Set<TodoStateId>>(() => {
@@ -631,6 +637,18 @@ function AppShellContent({
     return counts
   }, [workspaceSessionMetas, todoStates])
 
+  // Count sources by type for the Sources dropdown subcategories
+  const sourceTypeCounts = useMemo(() => {
+    const counts = { api: 0, mcp: 0, local: 0 }
+    for (const source of sources) {
+      const t = source.config.type
+      if (t === 'api' || t === 'mcp' || t === 'local') {
+        counts[t]++
+      }
+    }
+    return counts
+  }, [sources])
+
   // Filter session metadata based on sidebar mode and chat filter
   const filteredSessionMetas = useMemo(() => {
     // When in sources mode, return empty (no sessions to show)
@@ -767,9 +785,22 @@ function AppShellContent({
     navigate(routes.view.state(stateId))
   }, [])
 
-  // Handler for sources view
+  // Handler for sources view (all sources)
   const handleSourcesClick = useCallback(() => {
     navigate(routes.view.sources())
+  }, [])
+
+  // Handlers for source type filter views (subcategories in Sources dropdown)
+  const handleSourcesApiClick = useCallback(() => {
+    navigate(routes.view.sourcesApi())
+  }, [])
+
+  const handleSourcesMcpClick = useCallback(() => {
+    navigate(routes.view.sourcesMcp())
+  }, [])
+
+  const handleSourcesLocalClick = useCallback(() => {
+    navigate(routes.view.sourcesLocal())
   }, [])
 
   // Handler for skills view
@@ -1159,14 +1190,58 @@ function AppShellContent({
                       title: "Sources",
                       label: String(sources.length),
                       icon: DatabaseZap,
-                      variant: isSourcesNavigation(navState) ? "default" : "ghost",
+                      // Highlight when in sources navigator and no type filter (or viewing all)
+                      variant: (isSourcesNavigation(navState) && !sourceFilter) ? "default" : "ghost",
                       onClick: handleSourcesClick,
                       dataTutorial: "sources-nav",
+                      // Make expandable with source type subcategories
+                      expandable: true,
+                      expanded: isExpanded('nav:sources'),
+                      onToggle: () => toggleExpanded('nav:sources'),
                       // Context menu: Add Source
                       contextMenu: {
                         type: 'sources',
                         onAddSource: openAddSource,
                       },
+                      // Subcategories for source types: APIs, MCPs, Local Folders
+                      items: [
+                        {
+                          id: "nav:sources:api",
+                          title: "APIs",
+                          label: String(sourceTypeCounts.api),
+                          icon: Globe,
+                          variant: (sourceFilter?.kind === 'type' && sourceFilter.sourceType === 'api') ? "default" : "ghost",
+                          onClick: handleSourcesApiClick,
+                          contextMenu: {
+                            type: 'sources' as const,
+                            onAddSource: openAddSource,
+                          },
+                        },
+                        {
+                          id: "nav:sources:mcp",
+                          title: "MCPs",
+                          label: String(sourceTypeCounts.mcp),
+                          icon: <McpIcon className="h-3.5 w-3.5" />,
+                          variant: (sourceFilter?.kind === 'type' && sourceFilter.sourceType === 'mcp') ? "default" : "ghost",
+                          onClick: handleSourcesMcpClick,
+                          contextMenu: {
+                            type: 'sources' as const,
+                            onAddSource: openAddSource,
+                          },
+                        },
+                        {
+                          id: "nav:sources:local",
+                          title: "Local Folders",
+                          label: String(sourceTypeCounts.local),
+                          icon: FolderOpen,
+                          variant: (sourceFilter?.kind === 'type' && sourceFilter.sourceType === 'local') ? "default" : "ghost",
+                          onClick: handleSourcesLocalClick,
+                          contextMenu: {
+                            type: 'sources' as const,
+                            onAddSource: openAddSource,
+                          },
+                        },
+                      ],
                     },
                     {
                       id: "nav:skills",
@@ -1371,9 +1446,10 @@ function AppShellContent({
             />
             {/* Content: SessionList, SourcesListPanel, or SettingsNavigator based on navigation state */}
             {isSourcesNavigation(navState) && (
-              /* Sources List */
+              /* Sources List - filtered by type if sourceFilter is active */
               <SourcesListPanel
                 sources={sources}
+                sourceFilter={sourceFilter}
                 workspaceRootPath={activeWorkspace?.rootPath}
                 onDeleteSource={handleDeleteSource}
                 onSourceClick={handleSourceSelect}

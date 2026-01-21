@@ -1,12 +1,13 @@
 {
   "name": "craft-agent",
-  "version": "0.2.22",
+  "version": "0.2.23",
   "description": "Claude Code-like agent for Craft documents",
   "type": "module",
   "private": true,
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "!apps/online-docs"
   ],
   "scripts": {
     "test": "bun test",
@@ -50,7 +51,8 @@
     "viewer:preview": "vite preview --config apps/viewer/vite.config.ts",
     "marketing:dev": "vite dev --config apps/marketing/vite.config.ts",
     "marketing:build": "vite build --config apps/marketing/vite.config.ts",
-    "marketing:preview": "vite preview --config apps/marketing/vite.config.ts"
+    "marketing:preview": "vite preview --config apps/marketing/vite.config.ts",
+    "docs:dev": "cd apps/online-docs && npm install && npx mintlify dev"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.947.0",
@@ -85,7 +87,7 @@
     "vite": "^6.2.4"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.12",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.14",
     "@anthropic-ai/sdk": "^0.71.1",
     "@modelcontextprotocol/sdk": "^1.24.3",
     "@radix-ui/react-avatar": "^1.1.11",

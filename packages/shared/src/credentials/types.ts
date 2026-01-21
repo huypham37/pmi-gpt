@@ -2,15 +2,13 @@
  * Credential Storage Types
  *
  * Defines the types for secure credential storage using AES-256-GCM encryption.
- * Supports global, workspace-scoped, and source-scoped credentials.
+ * Supports global and source-scoped credentials.
  *
- * Credential key naming (workspace-scoped):
- *   Format: "{type}::{scope...}"
+ * Credential key format: "{type}::{scope...}"
  *
  * Examples:
  *   - anthropic_api_key::global
  *   - claude_oauth::global
- *   - craft_oauth::global (for Craft API, not MCP)
  *   - source_oauth::{workspaceId}::{sourceId}
  *   - source_bearer::{workspaceId}::{sourceId}
  *
@@ -19,13 +17,9 @@
 
 /** Types of credentials we store */
 export type CredentialType =
-  | 'anthropic_api_key'
-  | 'claude_oauth'
-  | 'craft_oauth'
-  | 'workspace_oauth'
-  | 'workspace_bearer'
-  | 'mcp_oauth'
-  | 'api_key'
+  // Global credentials
+  | 'anthropic_api_key'  // Anthropic API key for Claude
+  | 'claude_oauth'       // Claude OAuth token (Max subscription)
   // Source credentials (stored at ~/.craft-agent/workspaces/{ws}/sources/{slug}/)
   | 'source_oauth'       // OAuth tokens for MCP/API sources
   | 'source_bearer'      // Bearer tokens
@@ -36,12 +30,6 @@ export type CredentialType =
 const VALID_CREDENTIAL_TYPES: readonly CredentialType[] = [
   'anthropic_api_key',
   'claude_oauth',
-  'craft_oauth',
-  'workspace_oauth',
-  'workspace_bearer',
-  'mcp_oauth',
-  'api_key',
-  // Source credentials
   'source_oauth',
   'source_bearer',
   'source_apikey',

@@ -296,11 +296,8 @@ export default function App() {
 
         if (needs.isFullyConfigured) {
           setAppState('ready')
-        } else if (needs.needsReauth) {
-          // Session expired - show simple re-login screen (preserves conversations)
-          setAppState('reauth')
         } else {
-          // New user or needs full setup - show full onboarding
+          // New user or needs setup - show onboarding
           setAppState('onboarding')
         }
       } catch (error) {
@@ -1041,8 +1038,6 @@ export default function App() {
       setWindowWorkspaceId(null)
       // Reset setupNeeds to force fresh onboarding start
       setSetupNeeds({
-        needsCraftAuth: true,
-        needsReauth: false,
         needsBillingConfig: true,
         needsCredentials: true,
         isFullyConfigured: false,

@@ -48,6 +48,7 @@ import type {
   Session,
   NavigationState,
   ChatFilter,
+  SourceFilter,
   RightSidebarPanel,
   ContentBadge,
 } from '../../shared/types'
@@ -177,10 +178,16 @@ export function NavigationProvider({
     [filterSessionsByFilter]
   )
 
-  // Helper: Get first source slug
+  // Helper: Get first source slug (optionally filtered by type)
   const getFirstSourceSlug = useCallback(
-    (): string | null => {
-      return sources[0]?.config.slug ?? null
+    (filter?: SourceFilter | null): string | null => {
+      // If no filter or 'all', return first source
+      if (!filter || filter.kind === 'all') {
+        return sources[0]?.config.slug ?? null
+      }
+      // Filter by source type and return first match
+      const filtered = sources.filter(s => s.config.type === filter.sourceType)
+      return filtered[0]?.config.slug ?? null
     },
     [sources]
   )
@@ -348,9 +355,9 @@ export function NavigationProvider({
         }
       }
 
-      // For sources: auto-select first source if no details provided
+      // For sources: auto-select first source if no details provided (respects filter)
       if (isSourcesNavigation(newState) && !newState.details) {
-        const firstSourceSlug = getFirstSourceSlug()
+        const firstSourceSlug = getFirstSourceSlug(newState.filter)
         if (firstSourceSlug) {
           const stateWithSelection: NavigationState = {
             ...newState,

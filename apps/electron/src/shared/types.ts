@@ -488,6 +488,9 @@ export const IPC_CHANNELS = {
   GET_HOME_DIR: 'system:homeDir',
   IS_DEBUG_MODE: 'system:isDebugMode',
 
+  // Git
+  GET_GIT_BRANCH: 'git:branch',
+
   // Auto-update
   UPDATE_CHECK: 'update:check',
   UPDATE_GET_INFO: 'update:getInfo',
@@ -681,6 +684,9 @@ export interface ElectronAPI {
   getHomeDir(): Promise<string>
   isDebugMode(): Promise<boolean>
 
+  // Git
+  getGitBranch(path: string): Promise<string | null>
+
   // Auto-update
   checkForUpdates(): Promise<UpdateInfo>
   getUpdateInfo(): Promise<UpdateInfo>
@@ -716,7 +722,6 @@ export interface ElectronAPI {
     authType?: AuthType  // Optional - if not provided, preserves existing auth type (for add workspace)
     workspace?: { name: string; iconUrl?: string; mcpUrl?: string }  // Optional - if not provided, only updates billing
     credential?: string  // API key or OAuth token based on authType
-    mcpCredentials?: { accessToken: string; clientId?: string }  // MCP OAuth credentials
   }): Promise<OnboardingSaveResult>
   // Claude OAuth
   getExistingClaudeToken(): Promise<string | null>
@@ -924,6 +929,15 @@ export type ChatFilter =
   | { kind: 'state'; stateId: string }
 
 /**
+ * Source filter options - determines which sources to show
+ * - 'all': All sources regardless of type
+ * - 'type': Sources of specific type (api, mcp, local)
+ */
+export type SourceFilter =
+  | { kind: 'all' }
+  | { kind: 'type'; sourceType: 'api' | 'mcp' | 'local' }
+
+/**
  * Settings subpage options
  */
 export type SettingsSubpage = 'app' | 'workspace' | 'permissions' | 'shortcuts' | 'preferences'
@@ -945,6 +959,8 @@ export interface ChatsNavigationState {
  */
 export interface SourcesNavigationState {
   navigator: 'sources'
+  /** Filter to show all sources or by type (api, mcp, local). Defaults to 'all' if not specified. */
+  filter?: SourceFilter
   /** Selected source details, or null for empty state */
   details: { type: 'source'; sourceSlug: string } | null
   /** Optional right sidebar panel state */
@@ -1029,10 +1045,15 @@ export const DEFAULT_NAVIGATION_STATE: NavigationState = {
  */
 export const getNavigationStateKey = (state: NavigationState): string => {
   if (state.navigator === 'sources') {
-    if (state.details) {
-      return `sources/source/${state.details.sourceSlug}`
+    // Build base key from filter (sources, sources/api, sources/mcp, sources/local)
+    let base = 'sources'
+    if (state.filter?.kind === 'type') {
+      base = `sources/${state.filter.sourceType}`
     }
-    return 'sources'
+    if (state.details) {
+      return `${base}/source/${state.details.sourceSlug}`
+    }
+    return base
   }
   if (state.navigator === 'skills') {
     if (state.details) {
@@ -1059,8 +1080,22 @@ export const getNavigationStateKey = (state: NavigationState): string => {
  * Returns null if the key is invalid
  */
 export const parseNavigationStateKey = (key: string): NavigationState | null => {
-  // Handle sources
+  // Handle sources with optional type filter (sources, sources/api, sources/mcp, sources/local)
   if (key === 'sources') return { navigator: 'sources', details: null }
+
+  // Check for type-filtered sources (e.g., sources/api, sources/mcp, sources/local)
+  const sourceTypeMatch = key.match(/^sources\/(api|mcp|local)(?:\/source\/(.+))?$/)
+  if (sourceTypeMatch) {
+    const sourceType = sourceTypeMatch[1] as 'api' | 'mcp' | 'local'
+    const sourceSlug = sourceTypeMatch[2]
+    return {
+      navigator: 'sources',
+      filter: { kind: 'type', sourceType },
+      details: sourceSlug ? { type: 'source', sourceSlug } : null,
+    }
+  }
+
+  // Unfiltered source selection (e.g., sources/source/my-source)
   if (key.startsWith('sources/source/')) {
     const sourceSlug = key.slice(15)
     if (sourceSlug) {

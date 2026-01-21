@@ -101,14 +101,34 @@ export const routes = {
         ? `state/${stateId}/chat/${sessionId}` as const
         : `state/${stateId}` as const,
 
-    /** Sources view (sources navigator) */
-    sources: (params?: { sourceSlug?: string }) => {
-      const { sourceSlug } = params ?? {}
+    /** Sources view (sources navigator) - supports type filtering */
+    sources: (params?: { sourceSlug?: string; type?: 'api' | 'mcp' | 'local' }) => {
+      const { sourceSlug, type } = params ?? {}
+      // Build base from filter type
+      const base = type ? `sources/${type}` : 'sources'
       if (sourceSlug) {
-        return `sources/source/${sourceSlug}` as const
+        return `${base}/source/${sourceSlug}` as const
       }
-      return 'sources' as const
+      return base as 'sources' | `sources/${'api' | 'mcp' | 'local'}`
     },
+
+    /** API sources view (sources navigator, api filter) */
+    sourcesApi: (sourceSlug?: string) =>
+      sourceSlug
+        ? `sources/api/source/${sourceSlug}` as const
+        : 'sources/api' as const,
+
+    /** MCP sources view (sources navigator, mcp filter) */
+    sourcesMcp: (sourceSlug?: string) =>
+      sourceSlug
+        ? `sources/mcp/source/${sourceSlug}` as const
+        : 'sources/mcp' as const,
+
+    /** Local folder sources view (sources navigator, local filter) */
+    sourcesLocal: (sourceSlug?: string) =>
+      sourceSlug
+        ? `sources/local/source/${sourceSlug}` as const
+        : 'sources/local' as const,
 
     /** Skills view (skills navigator) */
     skills: (skillSlug?: string) =>

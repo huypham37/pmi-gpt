@@ -422,9 +422,9 @@ export default function WorkspaceSettingsPage() {
                   value={permissionMode}
                   onValueChange={(v) => handlePermissionModeChange(v as PermissionMode)}
                   options={[
-                    { value: 'safe', label: 'Explore', description: 'Read-only, no changes allowed' },
-                    { value: 'ask', label: 'Ask', description: 'Prompts before making edits' },
-                    { value: 'allow-all', label: 'Auto', description: 'Full autonomous execution' },
+                    { value: 'safe', label: PERMISSION_MODE_CONFIG['safe'].shortName, description: 'Read-only, no changes allowed' },
+                    { value: 'ask', label: PERMISSION_MODE_CONFIG['ask'].shortName, description: 'Prompts before making edits' },
+                    { value: 'allow-all', label: PERMISSION_MODE_CONFIG['allow-all'].shortName, description: 'Full autonomous execution' },
                   ]}
                 />
               </SettingsCard>

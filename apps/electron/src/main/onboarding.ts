@@ -82,7 +82,6 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
     authType?: AuthType  // Optional - if not provided, preserves existing auth type
     workspace?: { name: string; iconUrl?: string; mcpUrl?: string }  // Optional - if not provided, only updates billing
     credential?: string
-    mcpCredentials?: { accessToken: string; clientId?: string }
   }): Promise<OnboardingSaveResult> => {
     mainLog.info('[Onboarding:Main] ONBOARDING_SAVE_CONFIG received', {
       authType: config.authType,
@@ -91,7 +90,6 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
       mcpUrl: config.workspace?.mcpUrl,
       hasCredential: !!config.credential,
       credentialLength: config.credential?.length,
-      hasMcpCredentials: !!config.mcpCredentials,
     })
 
     try {
@@ -166,17 +164,6 @@ export function registerOnboardingHandlers(sessionManager: SessionManager): void
           mcpUrl: config.workspace.mcpUrl,
         }
         mainLog.info('[Onboarding:Main] Workspace config:', workspace, existingWorkspace ? '(updating existing)' : '(new)')
-
-        // Save MCP credentials if provided
-        if (config.mcpCredentials) {
-          mainLog.info('[Onboarding:Main] Saving MCP credentials for workspace')
-          await manager.setWorkspaceOAuth(workspaceId, {
-            accessToken: config.mcpCredentials.accessToken,
-            tokenType: 'Bearer',
-            clientId: config.mcpCredentials.clientId,
-          })
-          mainLog.info('[Onboarding:Main] MCP credentials saved')
-        }
 
         if (existingIndex !== -1) {
           // Update existing workspace

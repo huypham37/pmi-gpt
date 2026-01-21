@@ -70,9 +70,18 @@ function formatTokenCount(tokens: number): string {
   return tokens.toString()
 }
 
+/** Default rotating placeholders for onboarding/empty state */
+const DEFAULT_PLACEHOLDERS = [
+  'What would you like to work on?',
+  'Ask me to analyze your codebase...',
+  'Describe a bug you need help fixing...',
+  'I can help you write documentation...',
+  'Let\'s refactor some code together...',
+]
+
 export interface FreeFormInputProps {
-  /** Placeholder text for the textarea */
-  placeholder?: string
+  /** Placeholder text(s) for the textarea - can be array for rotation */
+  placeholder?: string | string[]
   /** Whether input is disabled */
   disabled?: boolean
   /** Whether the session is currently processing */
@@ -156,7 +165,7 @@ export interface FreeFormInputProps {
  * - Active option badges
  */
 export function FreeFormInput({
-  placeholder = 'Message...',
+  placeholder = DEFAULT_PLACEHOLDERS,
   disabled = false,
   isProcessing = false,
   onSubmit,
@@ -1452,6 +1461,7 @@ function WorkingDirectoryBadge({
   const [recentDirs, setRecentDirs] = React.useState<string[]>([])
   const [popoverOpen, setPopoverOpen] = React.useState(false)
   const [homeDir, setHomeDir] = React.useState<string>('')
+  const [gitBranch, setGitBranch] = React.useState<string | null>(null)
   const [filter, setFilter] = React.useState('')
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -1462,6 +1472,17 @@ function WorkingDirectoryBadge({
       if (dir) setHomeDir(dir)
     })
   }, [])
+
+  // Fetch git branch when working directory changes
+  React.useEffect(() => {
+    if (workingDirectory) {
+      window.electronAPI?.getGitBranch?.(workingDirectory).then((branch: string | null) => {
+        setGitBranch(branch)
+      })
+    } else {
+      setGitBranch(null)
+    }
+  }, [workingDirectory])
 
   // Reset filter and focus input when popover opens
   React.useEffect(() => {
@@ -1539,6 +1560,7 @@ function WorkingDirectoryBadge({
                 <span className="flex flex-col gap-0.5">
                   <span className="font-medium">Working directory</span>
                   <span className="text-xs opacity-70">{formatPathForDisplay(workingDirectory, homeDir)}</span>
+                  {gitBranch && <span className="text-xs opacity-70">on {gitBranch}</span>}
                 </span>
               ) : "Choose working directory"
             }

@@ -44,6 +44,8 @@ export interface SessionViewerProps {
   header?: ReactNode
   /** Custom footer content (input area for interactive mode) */
   footer?: ReactNode
+  /** Optional session folder path for stripping from file paths in tool display */
+  sessionFolderPath?: string
 }
 
 /**
@@ -80,6 +82,7 @@ export function SessionViewer({
   defaultExpanded = false,
   header,
   footer,
+  sessionFolderPath,
 }: SessionViewerProps) {
   // Convert StoredMessage[] to Message[] and group into turns
   const turns = useMemo(
@@ -205,6 +208,7 @@ export function SessionViewer({
                       ? () => platformActions.onOpenMultiFileDiff!(session.id, turn.turnId)
                       : undefined
                     }
+                    sessionFolderPath={sessionFolderPath}
                   />
                 )
               }

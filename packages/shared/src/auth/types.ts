@@ -11,12 +11,6 @@ import type { AuthType, Workspace } from '../config/types.ts';
  * Unified authentication state
  */
 export interface AuthState {
-  /** Craft platform authentication (for accessing Craft API and MCP) */
-  craft: {
-    hasToken: boolean;
-    token: string | null;
-  };
-
   /** Claude API billing configuration */
   billing: {
     /** Configured billing type, or null if not yet configured */
@@ -40,10 +34,6 @@ export interface AuthState {
  * What setup steps are needed
  */
 export interface SetupNeeds {
-  /** No Craft token AND no workspace → show full onboarding (new user) */
-  needsCraftAuth: boolean;
-  /** Has workspace but token expired/missing → show simple re-login screen */
-  needsReauth: boolean;
   /** No billing type configured → show billing picker */
   needsBillingConfig: boolean;
   /** Billing type set but missing credentials → show credential entry */

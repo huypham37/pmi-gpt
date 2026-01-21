@@ -1304,11 +1304,12 @@ This guide explains how to customize the visual theme of Craft Agent.
 
 ## Overview
 
-Craft Agent uses a 6-color theme system with cascading configuration:
-- **App-level theme**: \`~/.craft-agent/theme.json\` - Global defaults
-- **Workspace-level theme**: \`~/.craft-agent/workspaces/{id}/theme.json\` - Per-workspace overrides
+Craft Agent uses a 6-color theme system. You can override specific colors or install preset themes with complete visual styles.
 
-Workspace themes override app-level themes. Both are optional - the app has sensible defaults.
+- **Theme overrides**: \`~/.craft-agent/theme.json\` - Override specific colors
+- **Preset themes**: \`~/.craft-agent/themes/{name}.json\` - Complete theme packages
+
+Both are optional - the app has sensible built-in defaults.
 
 ## 6-Color System
 
@@ -1316,7 +1317,7 @@ Workspace themes override app-level themes. Both are optional - the app has sens
 |-------|---------|-------|
 | \`background\` | Surface/page background | Light/dark surface color |
 | \`foreground\` | Text and icons | Primary text color |
-| \`accent\` | Brand color, Auto mode | Highlights, active states, purple UI elements |
+| \`accent\` | Brand color, Execute mode | Highlights, active states, purple UI elements |
 | \`info\` | Warnings, Ask mode | Amber indicators, attention states |
 | \`success\` | Connected status | Green checkmarks, success states |
 | \`destructive\` | Errors, delete actions | Red alerts, failed states |
@@ -1332,23 +1333,15 @@ Any valid CSS color format is supported:
 
 **Recommendation**: Use OKLCH for perceptually uniform colors that look consistent across light/dark modes.
 
-## theme.json Schema
+## Theme Override File
+
+Create \`~/.craft-agent/theme.json\` to override specific colors:
 
 \`\`\`json
 {
-  "background": "oklch(0.98 0.003 265)",
-  "foreground": "oklch(0.185 0.01 270)",
   "accent": "oklch(0.58 0.22 293)",
-  "info": "oklch(0.75 0.16 70)",
-  "success": "oklch(0.55 0.17 145)",
-  "destructive": "oklch(0.58 0.24 28)",
   "dark": {
-    "background": "oklch(0.145 0.015 270)",
-    "foreground": "oklch(0.95 0.01 270)",
-    "accent": "oklch(0.65 0.22 293)",
-    "info": "oklch(0.78 0.14 70)",
-    "success": "oklch(0.60 0.17 145)",
-    "destructive": "oklch(0.65 0.22 28)"
+    "accent": "oklch(0.65 0.22 293)"
   }
 }
 \`\`\`
@@ -1362,6 +1355,92 @@ The \`dark\` object provides optional overrides for dark mode. When the user's s
 2. Any colors defined in \`dark\` override the base colors
 
 This allows partial dark mode customization - only override what needs to differ.
+
+## Preset Themes
+
+Preset themes are complete theme packages stored at \`~/.craft-agent/themes/\`. Each preset is a JSON file with theme colors and metadata.
+
+### Preset Theme Schema
+
+\`\`\`json
+{
+  "name": "Dracula",
+  "description": "A dark theme with vibrant colors",
+  "author": "Zeno Rocha",
+  "license": "MIT",
+  "source": "https://draculatheme.com",
+  "supportedModes": ["dark"],
+
+  "background": "oklch(0.22 0.02 280)",
+  "foreground": "oklch(0.95 0.01 270)",
+  "accent": "oklch(0.70 0.20 320)",
+  "info": "oklch(0.78 0.14 70)",
+  "success": "oklch(0.72 0.18 145)",
+  "destructive": "oklch(0.65 0.22 28)",
+
+  "shikiTheme": {
+    "light": "github-light",
+    "dark": "dracula"
+  }
+}
+\`\`\`
+
+### Preset Metadata Fields
+
+| Field | Description |
+|-------|-------------|
+| \`name\` | Display name for the theme |
+| \`description\` | Short description |
+| \`author\` | Theme creator |
+| \`license\` | License type (MIT, etc.) |
+| \`source\` | URL to original theme |
+| \`supportedModes\` | Array of \`"light"\`, \`"dark"\`, or both |
+| \`shikiTheme\` | Syntax highlighting theme (light/dark variants) |
+
+### Installing Preset Themes
+
+1. Download or create a theme JSON file
+2. Save it to \`~/.craft-agent/themes/{name}.json\`
+3. Select the theme in Settings → Appearance
+
+## Scenic Mode
+
+Scenic mode displays a full-window background image with glass-style panels. This creates a visually immersive experience.
+
+### Enabling Scenic Mode
+
+\`\`\`json
+{
+  "mode": "scenic",
+  "backgroundImage": "mountains.jpg",
+
+  "background": "oklch(0.15 0.02 270 / 0.8)",
+  "paper": "oklch(0.18 0.02 270 / 0.6)",
+  "navigator": "oklch(0.12 0.02 270 / 0.7)",
+  "popoverSolid": "oklch(0.18 0.02 270)"
+}
+\`\`\`
+
+### Scenic Mode Properties
+
+| Property | Description |
+|----------|-------------|
+| \`mode\` | Set to \`"scenic"\` (default is \`"solid"\`) |
+| \`backgroundImage\` | Image filename (relative to theme file) or URL |
+
+### Surface Colors for Glass Panels
+
+Scenic mode benefits from semi-transparent surface colors:
+
+| Color | Purpose |
+|-------|---------|
+| \`paper\` | AI messages, cards, elevated content |
+| \`navigator\` | Left sidebar background |
+| \`input\` | Input field background |
+| \`popover\` | Dropdowns, modals, context menus |
+| \`popoverSolid\` | Guaranteed 100% opaque popover background |
+
+**Note:** Scenic themes automatically force dark mode for better contrast with background images.
 
 ## Default Theme
 
@@ -1413,33 +1492,15 @@ The built-in default theme uses OKLCH colors optimized for accessibility:
 }
 \`\`\`
 
-### Workspace-specific theme
-Create \`~/.craft-agent/workspaces/{id}/theme.json\`:
-\`\`\`json
-{
-  "accent": "oklch(0.60 0.20 150)"
-}
-\`\`\`
-This workspace will use green accent while others use the app default.
-
-## Cascading Behavior
-
-1. **App theme** (\`~/.craft-agent/theme.json\`) sets global defaults
-2. **Workspace theme** overrides app theme for that workspace only
-3. **Built-in defaults** fill any unspecified colors
-
-Example: If app theme sets \`accent: blue\` and workspace theme sets \`accent: green\`, that workspace uses green while others use blue.
-
 ## Live Updates
 
 Theme changes are applied immediately - no restart needed. Edit theme.json and the UI updates automatically.
 
 ## Creating a Theme
 
-1. Decide scope: app-wide or workspace-specific
-2. Create the appropriate theme.json file
-3. Add only the colors you want to customize
-4. Optionally add \`dark\` overrides for dark mode
+1. Create \`~/.craft-agent/theme.json\` for overrides or \`~/.craft-agent/themes/{name}.json\` for a preset
+2. Add only the colors you want to customize
+3. Optionally add \`dark\` overrides for dark mode
 
 **Tips:**
 - Start with just \`accent\` to quickly personalize
@@ -1447,48 +1508,22 @@ Theme changes are applied immediately - no restart needed. Edit theme.json and t
 - Test in both light and dark modes
 - Keep contrast ratios accessible (foreground vs background)
 
-## Workflow
-
-### Creating an App Theme
-\`\`\`bash
-# Create or edit ~/.craft-agent/theme.json
-\`\`\`
-
-\`\`\`json
-{
-  "accent": "oklch(0.55 0.20 280)"
-}
-\`\`\`
-
-### Creating a Workspace Theme
-\`\`\`bash
-# Create theme in workspace folder
-# ~/.craft-agent/workspaces/{workspaceId}/theme.json
-\`\`\`
-
-\`\`\`json
-{
-  "accent": "oklch(0.60 0.22 120)",
-  "dark": {
-    "accent": "oklch(0.70 0.20 120)"
-  }
-}
-\`\`\`
-
 ## Troubleshooting
 
 **Theme not applying:**
 - Verify JSON syntax is valid
-- Check file is in correct location
+- Check file is in correct location (\`~/.craft-agent/theme.json\` for overrides, \`~/.craft-agent/themes/\` for presets)
 - Ensure color values are valid CSS colors
 
 **Colors look wrong in dark mode:**
 - Add explicit \`dark\` overrides
 - OKLCH colors may need higher lightness values for dark mode
+- Check if preset has \`supportedModes\` that excludes your current mode
 
-**Workspace theme not overriding:**
-- Verify workspace ID in path matches your workspace
-- Workspace themes only override defined values
+**Background image not showing:**
+- Ensure \`mode\` is set to \`"scenic"\`
+- Check image path is relative to theme file or a valid URL
+- Verify image file exists and is readable
 
 ## OKLCH Color Reference
 

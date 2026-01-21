@@ -230,80 +230,8 @@ export class CredentialManager {
     });
   }
 
-  /** Get Craft OAuth token */
-  async getCraftOAuth(): Promise<string | null> {
-    const cred = await this.get({ type: 'craft_oauth' });
-    return cred?.value || null;
-  }
-
-  /** Set Craft OAuth token */
-  async setCraftOAuth(token: string): Promise<void> {
-    await this.set({ type: 'craft_oauth' }, { value: token });
-  }
-
-  /** Get workspace OAuth credentials */
-  async getWorkspaceOAuth(
-    workspaceId: string
-  ): Promise<{
-    accessToken: string;
-    refreshToken?: string;
-    expiresAt?: number;
-    clientId?: string;
-    tokenType?: string;
-  } | null> {
-    const cred = await this.get({ type: 'workspace_oauth', workspaceId });
-    if (!cred) return null;
-
-    return {
-      accessToken: cred.value,
-      refreshToken: cred.refreshToken,
-      expiresAt: cred.expiresAt,
-      clientId: cred.clientId,
-      tokenType: cred.tokenType,
-    };
-  }
-
-  /** Set workspace OAuth credentials */
-  async setWorkspaceOAuth(
-    workspaceId: string,
-    credentials: {
-      accessToken: string;
-      refreshToken?: string;
-      expiresAt?: number;
-      clientId?: string;
-      tokenType?: string;
-    }
-  ): Promise<void> {
-    await this.set(
-      { type: 'workspace_oauth', workspaceId },
-      {
-        value: credentials.accessToken,
-        refreshToken: credentials.refreshToken,
-        expiresAt: credentials.expiresAt,
-        clientId: credentials.clientId,
-        tokenType: credentials.tokenType,
-      }
-    );
-  }
-
-  /** Get workspace bearer token */
-  async getWorkspaceBearer(workspaceId: string): Promise<string | null> {
-    const cred = await this.get({ type: 'workspace_bearer', workspaceId });
-    return cred?.value || null;
-  }
-
-  /** Set workspace bearer token */
-  async setWorkspaceBearer(workspaceId: string, token: string): Promise<void> {
-    await this.set({ type: 'workspace_bearer', workspaceId }, { value: token });
-  }
-
-  /** Delete all credentials for a workspace */
+  /** Delete all credentials for a workspace (source credentials) */
   async deleteWorkspaceCredentials(workspaceId: string): Promise<void> {
-    // Delete workspace-level credentials
-    await this.delete({ type: 'workspace_oauth', workspaceId });
-    await this.delete({ type: 'workspace_bearer', workspaceId });
-
-    // Delete all source credentials for this workspace
     const allCreds = await this.list({ workspaceId });
     for (const cred of allCreds) {
       await this.delete(cred);

@@ -813,7 +813,7 @@ function generateMismatchSuggestion(
     }
 
     return `The pattern expects a subcommand after \`${firstWord}\`, but found flag \`${failedToken}\`. ` +
-      `Run from the target directory or switch to Ask/Auto mode.`;
+      `Run from the target directory or switch to Ask/Execute mode.`;
   }
 
   // Detect possible typos in subcommands using simple heuristics
@@ -1544,7 +1544,9 @@ Read-only exploration mode. You can read, search, and explore but cannot make ch
 
 Example: \`git status && rm -rf /\` is blocked because \`&&\` allows command chaining. Run commands separately instead.
 
-**When ready to implement:** Don't ask the user to switch modes. Instead, write a plan and use \`SubmitPlan\` - the "Accept Plan" button switches to ${PERMISSION_MODE_CONFIG['allow-all'].displayName} mode automatically.
+**When ready to implement:** After gathering context, proactively move the conversation forward according to these guidelines:
+- **Be decisive** - When you've gathered enough context, write and submit the plan directly. If you're going to ask whether to proceed, always present your current thinking about the approach first — never ask without context. When uncertain about scope, share your understanding then ask "Ready for a plan?"
+- **Don't suggest manual mode switching** - Don't tell users to press SHIFT+TAB. When you submit a plan, the user sees an "Accept Plan" button that handles the mode transition automatically. Presenting a plan → one-click accept is the smoothest workflow.
 
 ### ${PERMISSION_MODE_CONFIG['ask'].displayName} (permissionMode: ask)
 

@@ -76,7 +76,7 @@ export function useOnboarding({
     credentialStatus: 'idle',
     completionStatus: 'saving',
     billingMethod: null,
-    isExistingUser: (initialSetupNeeds?.needsBillingConfig && !initialSetupNeeds?.needsCraftAuth) ?? false,
+    isExistingUser: initialSetupNeeds?.needsBillingConfig ?? false,
   })
 
   // Save configuration

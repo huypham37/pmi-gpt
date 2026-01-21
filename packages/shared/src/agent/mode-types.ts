@@ -230,8 +230,8 @@ export const PERMISSION_MODE_CONFIG: Record<PermissionMode, {
     },
   },
   'allow-all': {
-    displayName: 'Auto',
-    shortName: 'Auto',
+    displayName: 'Execute',
+    shortName: 'Execute',
     description: 'Automatic execution, no prompts.',
     // Repeat icon from Lucide (loop)
     svgPath: 'm17 1 4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',

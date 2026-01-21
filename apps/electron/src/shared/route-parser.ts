@@ -12,6 +12,7 @@
 import type {
   NavigationState,
   ChatFilter,
+  SourceFilter,
   SettingsSubpage,
   RightSidebarPanel,
 } from './types'
@@ -40,6 +41,8 @@ export interface ParsedCompoundRoute {
   navigator: NavigatorType
   /** Chat filter (only for chats navigator) */
   chatFilter?: ChatFilter
+  /** Source filter (only for sources navigator) */
+  sourceFilter?: SourceFilter
   /** Details page info (null for empty state) */
   details: {
     type: string
@@ -74,7 +77,11 @@ export function isCompoundRoute(route: string): boolean {
  *   'allChats/chat/abc123' -> { navigator: 'chats', chatFilter: { kind: 'allChats' }, details: { type: 'chat', id: 'abc123' } }
  *   'flagged/chat/abc123' -> { navigator: 'chats', chatFilter: { kind: 'flagged' }, details: { type: 'chat', id: 'abc123' } }
  *   'sources' -> { navigator: 'sources', details: null }
+ *   'sources/api' -> { navigator: 'sources', sourceFilter: { kind: 'type', sourceType: 'api' }, details: null }
+ *   'sources/mcp' -> { navigator: 'sources', sourceFilter: { kind: 'type', sourceType: 'mcp' }, details: null }
+ *   'sources/local' -> { navigator: 'sources', sourceFilter: { kind: 'type', sourceType: 'local' }, details: null }
  *   'sources/source/github' -> { navigator: 'sources', details: { type: 'source', id: 'github' } }
+ *   'sources/api/source/gmail' -> { navigator: 'sources', sourceFilter: { kind: 'type', sourceType: 'api' }, details: { type: 'source', id: 'gmail' } }
  *   'settings' -> { navigator: 'settings', details: { type: 'app', id: 'app' } }
  *   'settings/shortcuts' -> { navigator: 'settings', details: { type: 'shortcuts', id: 'shortcuts' } }
  */
@@ -95,13 +102,32 @@ export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
     }
   }
 
-  // Sources navigator
+  // Sources navigator - supports type filters (api, mcp, local)
   if (first === 'sources') {
     if (segments.length === 1) {
       return { navigator: 'sources', details: null }
     }
 
-    // sources/source/{sourceSlug}
+    // Check for type filter: sources/api, sources/mcp, sources/local
+    const validSourceTypes = ['api', 'mcp', 'local']
+    if (validSourceTypes.includes(segments[1])) {
+      const sourceType = segments[1] as 'api' | 'mcp' | 'local'
+      const sourceFilter: SourceFilter = { kind: 'type', sourceType }
+
+      // Check for source selection within filtered view: sources/api/source/{sourceSlug}
+      if (segments[2] === 'source' && segments[3]) {
+        return {
+          navigator: 'sources',
+          sourceFilter,
+          details: { type: 'source', id: segments[3] },
+        }
+      }
+
+      // Just the filter, no selection
+      return { navigator: 'sources', sourceFilter, details: null }
+    }
+
+    // Unfiltered source selection: sources/source/{sourceSlug}
     if (segments[1] === 'source' && segments[2]) {
       return {
         navigator: 'sources',
@@ -182,8 +208,13 @@ export function buildCompoundRoute(parsed: ParsedCompoundRoute): string {
   }
 
   if (parsed.navigator === 'sources') {
-    if (!parsed.details) return 'sources'
-    return `sources/source/${parsed.details.id}`
+    // Build base from filter (sources, sources/api, sources/mcp, sources/local)
+    let base = 'sources'
+    if (parsed.sourceFilter?.kind === 'type') {
+      base = `sources/${parsed.sourceFilter.sourceType}`
+    }
+    if (!parsed.details) return base
+    return `${base}/source/${parsed.details.id}`
   }
 
   if (parsed.navigator === 'skills') {
@@ -385,13 +416,18 @@ function convertCompoundToNavigationState(compound: ParsedCompoundRoute): Naviga
     return { navigator: 'settings', subpage }
   }
 
-  // Sources
+  // Sources - include filter if present
   if (compound.navigator === 'sources') {
     if (!compound.details) {
-      return { navigator: 'sources', details: null }
+      return {
+        navigator: 'sources',
+        filter: compound.sourceFilter,
+        details: null,
+      }
     }
     return {
       navigator: 'sources',
+      filter: compound.sourceFilter,
       details: { type: 'source', sourceSlug: compound.details.id },
     }
   }
@@ -521,10 +557,15 @@ export function buildRouteFromNavigationState(state: NavigationState): string {
   }
 
   if (state.navigator === 'sources') {
-    if (state.details) {
-      return `sources/source/${state.details.sourceSlug}`
+    // Build base from filter (sources, sources/api, sources/mcp, sources/local)
+    let base = 'sources'
+    if (state.filter?.kind === 'type') {
+      base = `sources/${state.filter.sourceType}`
     }
-    return 'sources'
+    if (state.details) {
+      return `${base}/source/${state.details.sourceSlug}`
+    }
+    return base
   }
 
   if (state.navigator === 'skills') {

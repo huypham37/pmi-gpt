@@ -26,10 +26,12 @@ import { DropdownMenuProvider, ContextMenuProvider } from '@/components/ui/menu-
 import { SourceMenu } from './SourceMenu'
 import { EditPopover, getEditConfig } from '@/components/ui/EditPopover'
 import { cn } from '@/lib/utils'
-import type { LoadedSource, SourceConnectionStatus } from '../../../shared/types'
+import type { LoadedSource, SourceConnectionStatus, SourceFilter } from '../../../shared/types'
 
 export interface SourcesListPanelProps {
   sources: LoadedSource[]
+  /** Filter to show only sources of a specific type (api, mcp, local) */
+  sourceFilter?: SourceFilter | null
   /** Workspace root path for EditPopover context */
   workspaceRootPath?: string
   onDeleteSource: (sourceSlug: string) => void
@@ -40,8 +42,25 @@ export interface SourcesListPanelProps {
   className?: string
 }
 
+/**
+ * Get user-friendly label for source type filter (for empty state messages)
+ */
+function getSourceTypeFilterLabel(sourceType: 'api' | 'mcp' | 'local'): string {
+  switch (sourceType) {
+    case 'api':
+      return 'API'
+    case 'mcp':
+      return 'MCP'
+    case 'local':
+      return 'local folder'
+    default:
+      return sourceType
+  }
+}
+
 export function SourcesListPanel({
   sources,
+  sourceFilter,
   workspaceRootPath,
   onDeleteSource,
   onSourceClick,
@@ -49,13 +68,30 @@ export function SourcesListPanel({
   localMcpEnabled = true,
   className,
 }: SourcesListPanelProps) {
+  // Filter sources based on type filter if active
+  const filteredSources = React.useMemo(() => {
+    if (!sourceFilter || sourceFilter.kind === 'all') {
+      return sources
+    }
+    // Filter by source type
+    return sources.filter(s => s.config.type === sourceFilter.sourceType)
+  }, [sources, sourceFilter])
+
+  // Build empty state message based on filter
+  const emptyMessage = React.useMemo(() => {
+    if (sourceFilter?.kind === 'type') {
+      return `No ${getSourceTypeFilterLabel(sourceFilter.sourceType)} sources configured.`
+    }
+    return 'No sources configured.'
+  }, [sourceFilter])
+
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div className="pb-2">
-        {sources.length === 0 ? (
+        {filteredSources.length === 0 ? (
           <div className="px-4 py-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No sources configured.
+              {emptyMessage}
             </p>
             {workspaceRootPath && (
               <EditPopover
@@ -70,7 +106,7 @@ export function SourcesListPanel({
           </div>
         ) : (
           <div className="pt-2">
-            {sources.map((source, index) => (
+            {filteredSources.map((source, index) => (
               <SourceItem
                 key={`${source.config.slug}-${source.config.connectionStatus}-${source.config.isAuthenticated}-${localMcpEnabled}`}
                 source={source}

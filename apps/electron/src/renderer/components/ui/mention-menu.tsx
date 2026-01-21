@@ -402,9 +402,22 @@ export function useInlineMention({
     const isValidTrigger = atMatch && hasItems && isValidMentionTrigger(textBeforeCursor, matchStart)
 
     if (isValidTrigger) {
+      const filterText = atMatch[1] || ''
+      // Check if there are any filtered results before opening menu
+      // This ensures Enter key works normally when no matches exist
+      const filteredSections = filterSections(sections, filterText)
+      const hasFilteredItems = filteredSections.some(s => s.items.length > 0)
+
+      if (!hasFilteredItems) {
+        // No results after filtering - close menu to allow normal Enter handling
+        setIsOpen(false)
+        setFilter('')
+        setAtStart(-1)
+        return
+      }
+
       setAtStart(matchStart)
-      // Filter by the content after @
-      setFilter(atMatch[1] || '')
+      setFilter(filterText)
 
       if (inputRef.current) {
         // Try to get actual caret position from the input element

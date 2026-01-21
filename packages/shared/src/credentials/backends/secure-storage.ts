@@ -4,9 +4,13 @@
  * Stores credentials in an encrypted file at ~/.craft-agent/credentials.enc
  * Uses AES-256-GCM for authenticated encryption.
  *
- * Encryption key is derived from machine-specific data (hostname, username, homedir)
- * using PBKDF2. This provides the same security model as OS keychains (relies on
- * OS user authentication) but without requiring keychain access prompts.
+ * Encryption key is derived from OS-native hardware UUID using PBKDF2:
+ * - macOS: IOPlatformUUID (tied to logic board, never changes)
+ * - Windows: MachineGuid from registry (set at OS install)
+ * - Linux: /var/lib/dbus/machine-id (set at OS install)
+ *
+ * This is more stable than the previous hostname-based derivation, which could
+ * change with network/DHCP. Legacy credentials are auto-migrated on first load.
  *
  * File format:
  *   [Header - 64 bytes]
@@ -27,6 +31,7 @@ import {
   pbkdf2Sync,
   createHash,
 } from 'crypto';
+import { execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { hostname, userInfo, homedir } from 'os';
 import { join, dirname } from 'path';
@@ -51,6 +56,47 @@ const KEY_SIZE = 32;
 
 // PBKDF2 iterations (balance security vs startup time)
 const PBKDF2_ITERATIONS = 100000;
+
+/**
+ * Get stable machine identifier using OS-native hardware UUID.
+ * This is far more stable than hostname which can change with network/DHCP.
+ * Falls back to username + homedir if hardware UUID unavailable.
+ */
+function getStableMachineId(): string {
+  try {
+    if (process.platform === 'darwin') {
+      // macOS: IOPlatformUUID - tied to logic board, never changes
+      const output = execSync(
+        'ioreg -rd1 -c IOPlatformExpertDevice | grep IOPlatformUUID',
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      const match = output.match(/"IOPlatformUUID"\s*=\s*"([^"]+)"/);
+      if (match?.[1]) return match[1];
+    } else if (process.platform === 'win32') {
+      // Windows: MachineGuid from registry - set at OS install
+      const output = execSync(
+        'reg query HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Cryptography /v MachineGuid',
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      const match = output.match(/MachineGuid\s+REG_SZ\s+(\S+)/);
+      if (match?.[1]) return match[1];
+    } else {
+      // Linux: dbus machine-id - set at OS install
+      const machineIdPath = '/var/lib/dbus/machine-id';
+      const altPath = '/etc/machine-id';
+      if (existsSync(machineIdPath)) {
+        return readFileSync(machineIdPath, 'utf-8').trim();
+      } else if (existsSync(altPath)) {
+        return readFileSync(altPath, 'utf-8').trim();
+      }
+    }
+  } catch {
+    // Fall through to fallback
+  }
+
+  // Fallback: username + homedir (stable enough for most cases)
+  return `${userInfo().username}:${homedir()}`;
+}
 
 /** Internal credential store structure */
 interface CredentialStore {
@@ -172,27 +218,50 @@ export class SecureStorageBackend implements CredentialBackend {
     const salt = fileData.subarray(MAGIC_SIZE + FLAGS_SIZE, MAGIC_SIZE + FLAGS_SIZE + SALT_SIZE);
     this.salt = salt;
 
-    // Get encryption key
-    const key = this.getEncryptionKey(salt);
-
     // Extract encrypted data
     const encryptedData = fileData.subarray(HEADER_SIZE);
-    const iv = encryptedData.subarray(0, IV_SIZE);
-    const authTag = encryptedData.subarray(IV_SIZE, IV_SIZE + AUTH_TAG_SIZE);
-    const ciphertext = encryptedData.subarray(IV_SIZE + AUTH_TAG_SIZE);
 
-    // Decrypt
+    // Try new stable key first (v2 - hardware UUID based)
+    const newKey = this.getEncryptionKey(salt);
+    let store = this.tryDecrypt(encryptedData, newKey);
+
+    if (store) {
+      this.cachedStore = store;
+      return store;
+    }
+
+    // Try legacy key for migration (v1 - included hostname)
+    // This handles credentials encrypted with old key derivation
+    const legacyKey = this.getLegacyEncryptionKey(salt);
+    store = this.tryDecrypt(encryptedData, legacyKey);
+
+    if (store) {
+      // Migration: re-save with new stable key so future loads use hardware UUID
+      this.cachedStore = store;
+      await this.saveStore(store);
+      return store;
+    }
+
+    // Both keys failed - file is truly corrupted
+    this.handleCorruptedFile();
+    return null;
+  }
+
+  /**
+   * Attempt to decrypt data with given key.
+   * Returns parsed store on success, null on failure.
+   */
+  private tryDecrypt(encryptedData: Buffer, key: Buffer): CredentialStore | null {
     try {
+      const iv = encryptedData.subarray(0, IV_SIZE);
+      const authTag = encryptedData.subarray(IV_SIZE, IV_SIZE + AUTH_TAG_SIZE);
+      const ciphertext = encryptedData.subarray(IV_SIZE + AUTH_TAG_SIZE);
+
       const decipher = createDecipheriv('aes-256-gcm', key, iv);
       decipher.setAuthTag(authTag);
-
       const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-
-      this.cachedStore = JSON.parse(decrypted.toString('utf8'));
-      return this.cachedStore;
+      return JSON.parse(decrypted.toString('utf8'));
     } catch {
-      // Decryption failed - file corrupted or machine changed
-      this.handleCorruptedFile();
       return null;
     }
   }
@@ -238,18 +307,32 @@ export class SecureStorageBackend implements CredentialBackend {
   private getEncryptionKey(salt: Buffer): Buffer {
     if (this.encryptionKey) return this.encryptionKey;
 
-    // Derive machine-specific identity
-    const machineId = createHash('sha256')
-      .update(hostname())
-      .update(userInfo().username)
-      .update(homedir())
-      .update('craft-agent-v1') // App-specific constant
+    // New stable machine ID using hardware UUID (v2)
+    // This is far more stable than hostname which can change with network/DHCP
+    const stableMachineId = createHash('sha256')
+      .update(getStableMachineId())
+      .update('craft-agent-v2') // Bumped version for new key derivation
       .digest();
 
     // Derive key using PBKDF2
-    this.encryptionKey = pbkdf2Sync(machineId, salt, PBKDF2_ITERATIONS, KEY_SIZE, 'sha256');
+    this.encryptionKey = pbkdf2Sync(stableMachineId, salt, PBKDF2_ITERATIONS, KEY_SIZE, 'sha256');
 
     return this.encryptionKey;
+  }
+
+  /**
+   * Legacy key derivation for migration from v1 (included hostname).
+   * Used to decrypt credentials from older versions before re-encrypting with stable key.
+   */
+  private getLegacyEncryptionKey(salt: Buffer): Buffer {
+    const legacyMachineId = createHash('sha256')
+      .update(hostname())
+      .update(userInfo().username)
+      .update(homedir())
+      .update('craft-agent-v1')
+      .digest();
+
+    return pbkdf2Sync(legacyMachineId, salt, PBKDF2_ITERATIONS, KEY_SIZE, 'sha256');
   }
 
   private handleCorruptedFile(): void {

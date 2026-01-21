@@ -87,6 +87,9 @@ const api: ElectronAPI = {
   getHomeDir: () => ipcRenderer.invoke(IPC_CHANNELS.GET_HOME_DIR),
   isDebugMode: () => ipcRenderer.invoke(IPC_CHANNELS.IS_DEBUG_MODE),
 
+  // Git
+  getGitBranch: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.GET_GIT_BRANCH, path),
+
   // Auto-update
   checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
   getUpdateInfo: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_INFO),
@@ -152,7 +155,6 @@ const api: ElectronAPI = {
     authType?: AuthType
     workspace?: { name: string; iconUrl?: string; mcpUrl?: string }
     credential?: string
-    mcpCredentials?: { accessToken: string; clientId?: string }
   }) => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_SAVE_CONFIG, config),
   // Claude OAuth
   getExistingClaudeToken: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_GET_EXISTING_CLAUDE_TOKEN),

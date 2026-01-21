@@ -4,6 +4,9 @@ copyright: Copyright © 2025 Craft Docs Ltd.
 
 electronVersion: "39.2.7"
 
+# Hook to compile macOS 26+ Liquid Glass icon after packaging
+afterPack: scripts/afterPack.cjs
+
 directories:
   output: release
   buildResources: resources
@@ -44,6 +47,10 @@ asar: false
 mac:
   category: public.app-category.productivity
   icon: resources/icon.icns
+  # macOS 26+ Liquid Glass: Tell macOS to look for icon in Assets.car
+  # The value must match --app-icon used in actool (see afterPack.js)
+  extendInfo:
+    CFBundleIconName: AppIcon
   target:
     - target: dmg
       arch:
