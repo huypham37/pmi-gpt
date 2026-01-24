@@ -53,6 +53,7 @@ import { DEFAULT_MODEL } from '@craft-agent/shared/config'
 import { type ThinkingLevel, DEFAULT_THINKING_LEVEL } from '@craft-agent/shared/agent/thinking-levels'
 import { evaluateAutoLabels } from '@craft-agent/shared/labels/auto'
 import { listLabels } from '@craft-agent/shared/labels/storage'
+import { extractLabelId } from '@craft-agent/shared/labels'
 
 /**
  * Sanitize message content for use as session title.
@@ -478,16 +479,16 @@ export class SessionManager {
   /**
    * Set up ConfigWatcher for a workspace to broadcast live updates
    * (sources added/removed, guide.md changes, etc.)
-   * Public so ipc.ts can call it when sources are first requested
-   * Supports multiple workspaces simultaneously
+   * Called during window init (GET_WINDOW_WORKSPACE) and workspace switch.
+   * workspaceId must be the global config ID (what the renderer knows).
    */
-  setupConfigWatcher(workspaceRootPath: string): void {
+  setupConfigWatcher(workspaceRootPath: string, workspaceId: string): void {
     // Check if already watching this workspace
     if (this.configWatchers.has(workspaceRootPath)) {
       return // Already watching this workspace
     }
 
-    sessionLog.info(`Setting up ConfigWatcher for workspace: ${workspaceRootPath}`)
+    sessionLog.info(`Setting up ConfigWatcher for workspace: ${workspaceId} (${workspaceRootPath})`)
 
     const callbacks: ConfigWatcherCallbacks = {
       onSourcesListChange: async (sources: LoadedSource[]) => {
@@ -520,15 +521,15 @@ export class SessionManager {
         const sources = loadWorkspaceSources(workspaceRootPath)
         this.broadcastSourcesChanged(sources)
       },
-      onStatusConfigChange: (workspaceId: string) => {
+      onStatusConfigChange: () => {
         sessionLog.info(`Status config changed in ${workspaceId}`)
         this.broadcastStatusesChanged(workspaceId)
       },
-      onStatusIconChange: (workspaceId: string, iconFilename: string) => {
+      onStatusIconChange: (_workspaceId: string, iconFilename: string) => {
         sessionLog.info(`Status icon changed: ${iconFilename} in ${workspaceId}`)
         this.broadcastStatusesChanged(workspaceId)
       },
-      onLabelConfigChange: (workspaceId: string) => {
+      onLabelConfigChange: () => {
         sessionLog.info(`Label config changed in ${workspaceId}`)
         this.broadcastLabelsChanged(workspaceId)
       },
@@ -2982,7 +2983,7 @@ To view this task's output:
       this.sendEvent({
         type: 'labels_changed',
         sessionId: managed.id,
-        labels,
+        labels: managed.labels,
       }, managed.workspace.id)
       // Persist to disk
       this.persistSession(managed)
