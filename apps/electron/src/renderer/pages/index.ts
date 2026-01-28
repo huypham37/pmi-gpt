@@ -6,11 +6,11 @@
 
 export { default as ChatPage } from './ChatPage'
 export { default as SourceInfoPage } from './SourceInfoPage'
-
 // Settings pages
 export {
   SettingsNavigator,
   AppSettingsPage,
+  AppearanceSettingsPage,
   WorkspaceSettingsPage,
   PermissionsSettingsPage,
   LabelsSettingsPage,

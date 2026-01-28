@@ -11,6 +11,8 @@
 import { join } from 'path';
 import { homedir } from 'os';
 import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from 'fs';
+import { getBundledAssetsDir } from '../utils/paths.ts';
+import { debug } from '../utils/debug.ts';
 
 const CONFIG_DIR = join(homedir(), '.craft-agent');
 const DOCS_DIR = join(CONFIG_DIR, 'docs');
@@ -18,37 +20,13 @@ const DOCS_DIR = join(CONFIG_DIR, 'docs');
 // Track if docs have been initialized this session (prevents re-init on hot reload)
 let docsInitialized = false;
 
-// Resolve the assets directory containing bundled documentation files.
-//
-// Uses __dirname-based paths first, which work reliably in both environments:
-// - Development (Bun):   __dirname = packages/shared/src/docs/
-//                         -> join(__dirname, '../../assets/docs') = packages/shared/assets/docs/
-// - Packaged (esbuild CJS): __dirname = <app-bundle>/dist/
-//                         -> join(__dirname, 'assets/docs') = <app-bundle>/dist/assets/docs/
-//
-// process.cwd()-based paths are kept as fallbacks but don't work in packaged
-// Electron apps where cwd is the user's directory, not the app bundle.
-// See: https://github.com/lukilabs/craft-agents-oss/issues/71
+// Resolve the bundled docs assets directory using the shared asset resolver.
+// Handles all environments: dev (monorepo source), bundled (dist/assets/docs),
+// and packaged Electron (setBundledAssetsRoot sets the base path at startup).
 function getAssetsDir(): string {
-  const possiblePaths = [
-    // 1. __dirname relative: development (packages/shared/src/docs/ -> ../../assets/docs)
-    join(__dirname, '..', '..', 'assets', 'docs'),
-    // 2. __dirname relative: bundled CJS (dist/ -> assets/docs)
-    join(__dirname, 'assets', 'docs'),
-    // 3. Fallback: process.cwd() for monorepo root in dev
-    join(process.cwd(), 'packages', 'shared', 'assets', 'docs'),
-    // 4. Fallback: process.cwd() for bundled builds
-    join(process.cwd(), 'dist', 'assets', 'docs'),
-  ];
-
-  for (const p of possiblePaths) {
-    if (existsSync(p)) {
-      return p;
-    }
-  }
-
-  // Fallback: first path (will fail gracefully if files don't exist)
-  return possiblePaths[0]!;
+  return getBundledAssetsDir('docs')
+    // Fallback: development path (will fail gracefully if files don't exist)
+    ?? join(process.cwd(), 'packages', 'shared', 'assets', 'docs');
 }
 
 /**
@@ -58,22 +36,24 @@ function getAssetsDir(): string {
  */
 function loadBundledDocs(): Record<string, string> {
   const assetsDir = getAssetsDir();
-  const docFiles = ['sources.md', 'skills.md', 'permissions.md', 'themes.md', 'statuses.md', 'labels.md'];
-
   const docs: Record<string, string> = {};
 
-  for (const filename of docFiles) {
+  // Auto-discover all files in the bundled docs directory.
+  // No hardcoded list — any file dropped into packages/shared/assets/docs/ is synced automatically.
+  let files: string[];
+  try {
+    files = existsSync(assetsDir) ? readdirSync(assetsDir) : [];
+  } catch {
+    console.warn(`[docs] Could not read assets dir: ${assetsDir}`);
+    return docs;
+  }
+
+  for (const filename of files) {
     const filePath = join(assetsDir, filename);
     try {
-      if (existsSync(filePath)) {
-        docs[filename] = readFileSync(filePath, 'utf-8');
-      } else {
-        console.warn(`[docs] Asset file not found: ${filePath}`);
-        docs[filename] = `# ${filename.replace('.md', '')}\n\nDocumentation not available.`;
-      }
+      docs[filename] = readFileSync(filePath, 'utf-8');
     } catch (error) {
       console.error(`[docs] Failed to load ${filename}:`, error);
-      docs[filename] = `# ${filename.replace('.md', '')}\n\nFailed to load documentation.`;
     }
   }
 
@@ -113,6 +93,8 @@ export const DOC_REFS = {
   themes: `${APP_ROOT}/docs/themes.md`,
   statuses: `${APP_ROOT}/docs/statuses.md`,
   labels: `${APP_ROOT}/docs/labels.md`,
+  toolIcons: `${APP_ROOT}/docs/tool-icons.md`,
+  mermaid: `${APP_ROOT}/docs/mermaid.md`,
   docsDir: `${APP_ROOT}/docs/`,
 } as const;
 
@@ -154,7 +136,7 @@ export function initializeDocs(): void {
     writeFileSync(docPath, content, 'utf-8');
   }
 
-  console.log(`[docs] Synced ${Object.keys(BUNDLED_DOCS).length} docs`);
+  debug(`[docs] Synced ${Object.keys(BUNDLED_DOCS).length} docs`);
 }
 
 export { BUNDLED_DOCS };

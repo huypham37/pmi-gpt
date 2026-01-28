@@ -366,7 +366,6 @@ export type SessionEvent =
   | { type: 'text_complete'; sessionId: string; text: string; isIntermediate?: boolean; turnId?: string; parentToolUseId?: string }
   | { type: 'tool_start'; sessionId: string; toolName: string; toolUseId: string; toolInput: Record<string, unknown>; toolIntent?: string; toolDisplayName?: string; toolDisplayMeta?: import('@craft-agent/core').ToolDisplayMeta; turnId?: string; parentToolUseId?: string }
   | { type: 'tool_result'; sessionId: string; toolUseId: string; toolName: string; result: string; turnId?: string; parentToolUseId?: string; isError?: boolean }
-  | { type: 'parent_update'; sessionId: string; toolUseId: string; parentToolUseId: string }
   | { type: 'error'; sessionId: string; error: string }
   | { type: 'typed_error'; sessionId: string; error: TypedError }
   | { type: 'complete'; sessionId: string; tokenUsage?: Session['tokenUsage']; hasUnread?: boolean }
@@ -506,6 +505,8 @@ export const IPC_CHANNELS = {
 
   // File operations
   READ_FILE: 'file:read',
+  READ_FILE_DATA_URL: 'file:readDataUrl',
+  READ_FILE_BINARY: 'file:readBinary',
   OPEN_FILE_DIALOG: 'file:openDialog',
   READ_FILE_ATTACHMENT: 'file:readAttachment',
   STORE_ATTACHMENT: 'file:storeAttachment',
@@ -657,6 +658,9 @@ export const IPC_CHANNELS = {
   THEME_BROADCAST_PREFERENCES: 'theme:broadcastPreferences',  // Send preferences to main for broadcast
   THEME_PREFERENCES_CHANGED: 'theme:preferencesChanged',  // Broadcast: preferences changed in another window
 
+  // Tool icon mappings (for Appearance settings)
+  TOOL_ICONS_GET_MAPPINGS: 'toolIcons:getMappings',
+
   // Logo URL resolution (uses Node.js filesystem cache)
   LOGO_GET_URL: 'logo:getUrl',
 
@@ -699,6 +703,15 @@ export const IPC_CHANNELS = {
 
 // Re-import types for ElectronAPI
 import type { Workspace, SessionMetadata, StoredAttachment as StoredAttachmentType } from '@craft-agent/core/types';
+
+/** Tool icon mapping entry from tool-icons.json (with icon resolved to data URL) */
+export interface ToolIconMapping {
+  id: string
+  displayName: string
+  /** Data URL of the icon (e.g., data:image/png;base64,...) */
+  iconDataUrl: string
+  commands: string[]
+}
 
 // Type-safe IPC API exposed to renderer
 export interface ElectronAPI {
@@ -743,6 +756,8 @@ export interface ElectronAPI {
 
   // File operations
   readFile(path: string): Promise<string>
+  /** Read a file as a data URL (data:{mime};base64,...) for binary preview (images, PDFs) */
+  readFileDataUrl(path: string): Promise<string>
   openFileDialog(): Promise<string[]>
   readFileAttachment(path: string): Promise<FileAttachment | null>
   storeAttachment(sessionId: string, attachment: FileAttachment): Promise<import('../../../../packages/core/src/types/index.ts').StoredAttachment>
@@ -891,6 +906,9 @@ export interface ElectronAPI {
   // Generic workspace image loading/saving (returns data URL for images, raw string for SVG)
   readWorkspaceImage(workspaceId: string, relativePath: string): Promise<string>
   writeWorkspaceImage(workspaceId: string, relativePath: string, base64: string, mimeType: string): Promise<void>
+
+  // Tool icon mappings (for Appearance settings page)
+  getToolIconMappings(): Promise<ToolIconMapping[]>
 
   // Theme (app-level only)
   getAppTheme(): Promise<import('@config/theme').ThemeOverrides | null>
@@ -1046,7 +1064,7 @@ export type ChatFilter =
 /**
  * Settings subpage options
  */
-export type SettingsSubpage = 'app' | 'workspace' | 'permissions' | 'labels' | 'shortcuts' | 'preferences'
+export type SettingsSubpage = 'app' | 'appearance' | 'workspace' | 'permissions' | 'labels' | 'shortcuts' | 'preferences'
 
 /**
  * Chats navigation state - shows SessionList in navigator
@@ -1097,7 +1115,7 @@ export interface SettingsNavigationState {
  */
 export interface SkillsNavigationState {
   navigator: 'skills'
-  /** Selected skill details, or null for empty state */
+  /** Selected skill details or null for empty state */
   details: { type: 'skill'; skillSlug: string } | null
   /** Optional right sidebar panel state */
   rightSidebar?: RightSidebarPanel
@@ -1165,7 +1183,7 @@ export const getNavigationStateKey = (state: NavigationState): string => {
     return 'sources'
   }
   if (state.navigator === 'skills') {
-    if (state.details) {
+    if (state.details?.type === 'skill') {
       return `skills/skill/${state.details.skillSlug}`
     }
     return 'skills'
@@ -1215,7 +1233,7 @@ export const parseNavigationStateKey = (key: string): NavigationState | null => 
   if (key === 'settings') return { navigator: 'settings', subpage: 'app' }
   if (key.startsWith('settings:')) {
     const subpage = key.slice(9) as SettingsSubpage
-    if (['app', 'workspace', 'permissions', 'labels', 'shortcuts', 'preferences'].includes(subpage)) {
+    if (['app', 'appearance', 'workspace', 'permissions', 'labels', 'shortcuts', 'preferences'].includes(subpage)) {
       return { navigator: 'settings', subpage }
     }
   }

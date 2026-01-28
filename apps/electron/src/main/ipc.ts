@@ -413,6 +413,54 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     }
   })
 
+  // Read a file as a data URL for in-app binary preview (images).
+  // Returns data:{mime};base64,{content} — used by ImagePreviewOverlay.
+  // Note: PDFs use file:// URLs directly (Chromium's PDF viewer doesn't support data: URLs).
+  ipcMain.handle(IPC_CHANNELS.READ_FILE_DATA_URL, async (_event, path: string) => {
+    try {
+      const safePath = await validateFilePath(path)
+      const buffer = await readFile(safePath)
+      const ext = safePath.split('.').pop()?.toLowerCase() ?? ''
+
+      // Map extensions to MIME types (only formats Chromium can render in-app).
+      // HEIC/HEIF and TIFF are excluded — no Chromium codec, opened externally instead.
+      const mimeMap: Record<string, string> = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        svg: 'image/svg+xml',
+        bmp: 'image/bmp',
+        ico: 'image/x-icon',
+        avif: 'image/avif',
+        pdf: 'application/pdf',
+      }
+      const mime = mimeMap[ext] || 'application/octet-stream'
+      const base64 = buffer.toString('base64')
+      return `data:${mime};base64,${base64}`
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      ipcLog.error('readFileDataUrl error:', message)
+      throw new Error(`Failed to read file as data URL: ${message}`)
+    }
+  })
+
+  // Read a file as raw binary (Uint8Array) for react-pdf.
+  // Returns Uint8Array which IPC automatically converts to ArrayBuffer for the renderer.
+  ipcMain.handle(IPC_CHANNELS.READ_FILE_BINARY, async (_event, path: string) => {
+    try {
+      const safePath = await validateFilePath(path)
+      const buffer = await readFile(safePath)
+      // Return as Uint8Array (serializes to ArrayBuffer over IPC)
+      return new Uint8Array(buffer)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      ipcLog.error('readFileBinary error:', message)
+      throw new Error(`Failed to read file as binary: ${message}`)
+    }
+  })
+
   // Open native file dialog for selecting files to attach
   ipcMain.handle(IPC_CHANNELS.OPEN_FILE_DIALOG, async () => {
     const result = await dialog.showOpenDialog({
@@ -2243,9 +2291,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
   // Preset themes (app-level)
   ipcMain.handle(IPC_CHANNELS.THEME_GET_PRESETS, async () => {
     const { loadPresetThemes } = await import('@craft-agent/shared/config/storage')
-    // Pass bundled themes path from Electron resources (dist/resources/themes)
-    const bundledThemesDir = join(__dirname, 'resources/themes')
-    return loadPresetThemes(bundledThemesDir)
+    return loadPresetThemes()
   })
 
   ipcMain.handle(IPC_CHANNELS.THEME_LOAD_PRESET, async (_event, themeId: string) => {
@@ -2275,6 +2321,33 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
         managed.window.webContents.send(IPC_CHANNELS.THEME_PREFERENCES_CHANGED, preferences)
       }
     }
+  })
+
+  // Tool icon mappings — loads tool-icons.json and resolves each entry's icon to a data URL
+  // for display in the Appearance settings page
+  ipcMain.handle(IPC_CHANNELS.TOOL_ICONS_GET_MAPPINGS, async () => {
+    const { getToolIconsDir } = await import('@craft-agent/shared/config/storage')
+    const { loadToolIconConfig } = await import('@craft-agent/shared/utils/cli-icon-resolver')
+    const { encodeIconToDataUrl } = await import('@craft-agent/shared/utils/icon-encoder')
+    const { join } = await import('path')
+
+    const toolIconsDir = getToolIconsDir()
+    const config = loadToolIconConfig(toolIconsDir)
+    if (!config) return []
+
+    return config.tools
+      .map(tool => {
+        const iconPath = join(toolIconsDir, tool.icon)
+        const iconDataUrl = encodeIconToDataUrl(iconPath)
+        if (!iconDataUrl) return null
+        return {
+          id: tool.id,
+          displayName: tool.displayName,
+          iconDataUrl,
+          commands: tool.commands,
+        }
+      })
+      .filter(Boolean)
   })
 
   // Logo URL resolution (uses Node.js filesystem cache for provider domains)

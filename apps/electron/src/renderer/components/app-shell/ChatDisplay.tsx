@@ -8,6 +8,7 @@ import {
   CircleAlert,
   ExternalLink,
   Info,
+  PenLine,
   X,
 } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
@@ -68,6 +69,8 @@ interface MarkdownOverlayState {
   type: 'markdown'
   content: string
   title: string
+  /** When true, show raw markdown source in code viewer instead of rendered preview */
+  forceCodeView?: boolean
 }
 
 /** Union of all overlay states, or null for no overlay */
@@ -789,11 +792,12 @@ export function ChatDisplay({
                           }))
                         }}
                         onPopOut={(text) => {
-                          // Open response text in markdown overlay
+                          // Open raw markdown source in code viewer
                           setOverlayState({
                             type: 'markdown',
                             content: text,
                             title: 'Response Preview',
+                            forceCodeView: true,
                           })
                         }}
                         onOpenDetails={() => {
@@ -806,8 +810,18 @@ export function ChatDisplay({
                           })
                         }}
                         onOpenActivityDetails={(activity) => {
+                          // Write tool for .md/.txt → Document overlay (rendered markdown)
+                          // rather than multi-diff, since these are better viewed as formatted documents
+                          const isDocumentWrite = activity.toolName === 'Write' && (() => {
+                            const actInput = activity.toolInput as Record<string, unknown> | undefined
+                            const fp = (actInput?.file_path as string) || ''
+                            const ext = fp.split('.').pop()?.toLowerCase()
+                            return ext === 'md' || ext === 'txt'
+                          })()
+
                           // Edit/Write tool → Multi-file diff overlay (ungrouped, focused on this change)
-                          if (activity.toolName === 'Edit' || activity.toolName === 'Write') {
+                          // Exception: Write to .md/.txt files goes to document overlay instead
+                          if ((activity.toolName === 'Edit' || activity.toolName === 'Write') && !isDocumentWrite) {
                             // Collect all Edit/Write activities from this turn for context
                             const changes: FileChange[] = []
                             for (const a of turn.activities) {
@@ -1013,7 +1027,6 @@ export function ChatDisplay({
           numLines={overlayData.numLines}
           theme={isDark ? 'dark' : 'light'}
           error={overlayData.error}
-          onOpenFile={onOpenFile}
         />
       )}
 
@@ -1026,7 +1039,6 @@ export function ChatDisplay({
           consolidated={overlayState.consolidated}
           focusedChangeId={overlayState.focusedChangeId}
           theme={isDark ? 'dark' : 'light'}
-          onOpenFile={onOpenFile}
           diffViewerSettings={diffViewerSettings}
           onDiffViewerSettingsChange={handleDiffViewerSettingsChange}
         />
@@ -1043,6 +1055,7 @@ export function ChatDisplay({
           toolType={overlayData.toolType}
           description={overlayData.description}
           theme={isDark ? 'dark' : 'light'}
+          error={overlayData.error}
         />
       )}
 
@@ -1058,15 +1071,43 @@ export function ChatDisplay({
         />
       )}
 
-      {/* Markdown preview overlay (pop-out, turn details) - renders markdown properly */}
-      {overlayState?.type === 'markdown' && (
+      {/* Document overlay (Write tool → .md/.txt files) — rendered markdown with tool badge */}
+      {overlayData?.type === 'document' && (
         <DocumentFormattedMarkdownOverlay
-          isOpen={true}
+          isOpen={!!overlayState}
           onClose={handleCloseOverlay}
-          content={overlayState.content}
+          content={overlayData.content}
+          filePath={overlayData.filePath}
+          typeBadge={{ icon: PenLine, label: overlayData.toolName, variant: 'write' }}
           onOpenUrl={onOpenUrl}
           onOpenFile={onOpenFile}
+          error={overlayData.error}
         />
+      )}
+
+      {/* Markdown preview overlay (pop-out, turn details) */}
+      {/* forceCodeView: show raw markdown source in code viewer (used by "View as Markdown" button) */}
+      {/* otherwise: render formatted markdown (used by turn details, etc.) */}
+      {overlayState?.type === 'markdown' && (
+        overlayState.forceCodeView ? (
+          <CodePreviewOverlay
+            isOpen={true}
+            onClose={handleCloseOverlay}
+            content={overlayState.content}
+            filePath="response.md"
+            language="markdown"
+            mode="read"
+            theme={isDark ? 'dark' : 'light'}
+          />
+        ) : (
+          <DocumentFormattedMarkdownOverlay
+            isOpen={true}
+            onClose={handleCloseOverlay}
+            content={overlayState.content}
+            onOpenUrl={onOpenUrl}
+            onOpenFile={onOpenFile}
+          />
+        )
       )}
 
       {/* Generic overlay for unknown tool types - route markdown to fullscreen viewer */}
@@ -1078,6 +1119,7 @@ export function ChatDisplay({
             content={overlayData.content}
             onOpenUrl={onOpenUrl}
             onOpenFile={onOpenFile}
+            error={overlayData.error}
           />
         ) : (
           <GenericOverlay
@@ -1086,6 +1128,7 @@ export function ChatDisplay({
             content={overlayData.content}
             title={overlayData.title}
             theme={isDark ? 'dark' : 'light'}
+            error={overlayData.error}
           />
         )
       )}
