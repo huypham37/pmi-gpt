@@ -26,10 +26,11 @@ export type {
   McpAuthType,
   AuthType,
   OAuthCredentials,
+  AgentProviderType,
 } from '@craft-agent/core/types';
 
 // Import for local use
-import type { Workspace, AuthType } from '@craft-agent/core/types';
+import type { Workspace, AuthType, AgentProviderType } from '@craft-agent/core/types';
 
 // Config stored in JSON file (credentials stored in encrypted file, not here)
 export interface StoredConfig {
@@ -50,6 +51,7 @@ export interface StoredConfig {
   autoCapitalisation?: boolean;  // Auto-capitalize first letter when typing (default: true)
   sendMessageKey?: 'enter' | 'cmd-enter';  // Key to send messages (default: 'enter')
   spellCheck?: boolean;  // Enable spell check in input (default: false)
+  provider?: AgentProviderType;  // Agent provider to use (default: 'opencode')
 }
 
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -232,6 +234,24 @@ export function setModel(model: string): void {
   saveConfig(config);
 }
 
+/**
+ * Get the agent provider type.
+ * Defaults to 'opencode' for internal use.
+ */
+export function getProvider(): AgentProviderType {
+  const config = loadStoredConfig();
+  return config?.provider ?? 'opencode';
+}
+
+/**
+ * Set the agent provider type.
+ */
+export function setProvider(provider: AgentProviderType): void {
+  const config = loadStoredConfig();
+  if (!config) return;
+  config.provider = provider;
+  saveConfig(config);
+}
 
 /**
  * Get whether desktop notifications are enabled.
@@ -553,6 +573,56 @@ export function syncWorkspaces(): void {
     }
     saveConfig(config);
   }
+}
+
+/**
+ * Ensure a default workspace exists for internal/OpenCode use.
+ * Creates ~/.craft-agent/workspaces/default/ if no workspaces exist.
+ * Also ensures config.json exists with the workspace registered.
+ *
+ * @returns The default workspace, or the first existing workspace
+ */
+export function ensureDefaultWorkspace(): Workspace {
+  ensureConfigDir();
+
+  // Check if config exists, create if not
+  let config = loadStoredConfig();
+  if (!config) {
+    config = {
+      workspaces: [],
+      activeWorkspaceId: null,
+      activeSessionId: null,
+      provider: 'opencode',  // Default to OpenCode for internal use
+    };
+    saveConfig(config);
+  }
+
+  // If workspaces exist, return the active one or first one
+  if (config.workspaces.length > 0) {
+    const active = config.workspaces.find(w => w.id === config!.activeWorkspaceId);
+    return active || config.workspaces[0]!;
+  }
+
+  // Create default workspace
+  const defaultWorkspacePath = join(CONFIG_DIR, 'workspaces', 'default');
+
+  // Create workspace folder structure
+  createWorkspaceAtPath(defaultWorkspacePath, 'Default Workspace');
+
+  // Add to global config
+  const newWorkspace: Workspace = {
+    id: generateWorkspaceId(),
+    name: 'Default Workspace',
+    rootPath: defaultWorkspacePath,
+    createdAt: Date.now(),
+  };
+
+  config.workspaces.push(newWorkspace);
+  config.activeWorkspaceId = newWorkspace.id;
+  config.provider = 'opencode';  // Ensure OpenCode is the provider
+  saveConfig(config);
+
+  return newWorkspace;
 }
 
 export async function removeWorkspace(workspaceId: string): Promise<boolean> {

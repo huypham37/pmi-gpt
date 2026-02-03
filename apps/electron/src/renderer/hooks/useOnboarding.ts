@@ -89,7 +89,7 @@ export function useOnboarding({
     loginStatus: 'idle',
     credentialStatus: 'idle',
     completionStatus: 'saving',
-    apiSetupMethod: null,
+    apiSetupMethod: 'api_key',
     isExistingUser: initialSetupNeeds?.needsBillingConfig ?? false,
     gitBashStatus: undefined,
     isRecheckingGitBash: false,
@@ -401,7 +401,7 @@ export function useOnboarding({
       loginStatus: 'idle',
       credentialStatus: 'idle',
       completionStatus: 'saving',
-      apiSetupMethod: null,
+      apiSetupMethod: 'api_key',
       isExistingUser: false,
       errorMessage: undefined,
     })

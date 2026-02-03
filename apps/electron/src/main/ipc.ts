@@ -156,6 +156,12 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     return { exists, path: workspacePath }
   })
 
+  // Ensure default workspace exists (for internal OpenCode use - skips auth)
+  ipcMain.handle(IPC_CHANNELS.ENSURE_DEFAULT_WORKSPACE, async () => {
+    const { ensureDefaultWorkspace } = await import('@craft-agent/shared/config')
+    return ensureDefaultWorkspace()
+  })
+
   // ============================================================
   // Window Management
   // ============================================================

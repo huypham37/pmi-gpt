@@ -306,27 +306,29 @@ export default function App() {
     }
   }, [])
 
-  // Check auth state and get window's workspace ID on mount
+  // Initialize app - ensure default workspace exists and go straight to ready
+  // (Internal OpenCode use - no authentication required)
   useEffect(() => {
     const initialize = async () => {
       try {
+        // Ensure default workspace exists (creates ~/.craft-agent/workspaces/default/ on first launch)
+        const workspace = await window.electronAPI.ensureDefaultWorkspace()
+
         // Get this window's workspace ID (passed via URL query param from main process)
-        const wsId = await window.electronAPI.getWindowWorkspace()
+        let wsId = await window.electronAPI.getWindowWorkspace()
+
+        // If no workspace ID assigned to window, use the default workspace
+        if (!wsId && workspace) {
+          wsId = workspace.id
+        }
         setWindowWorkspaceId(wsId)
 
-        const needs = await window.electronAPI.getSetupNeeds()
-        setSetupNeeds(needs)
-
-        if (needs.isFullyConfigured) {
-          setAppState('ready')
-        } else {
-          // New user or needs setup - show onboarding
-          setAppState('onboarding')
-        }
+        // Go directly to ready state - no auth check needed for internal use
+        setAppState('ready')
       } catch (error) {
-        console.error('Failed to check auth state:', error)
-        // If check fails, show onboarding to be safe
-        setAppState('onboarding')
+        console.error('Failed to initialize:', error)
+        // Even on error, try to proceed to ready state
+        setAppState('ready')
       }
     }
 

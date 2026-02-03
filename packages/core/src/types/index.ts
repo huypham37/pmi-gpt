@@ -9,6 +9,7 @@ export type {
   AuthType,
   OAuthCredentials,
   StoredConfig,
+  AgentProviderType,
 } from './workspace.ts';
 
 // Session types

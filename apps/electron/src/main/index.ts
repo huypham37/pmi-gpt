@@ -169,12 +169,16 @@ async function createInitialWindows(): Promise<void> {
 
   // Load saved window state
   const savedState = loadWindowState()
-  const workspaces = getWorkspaces()
-  const validWorkspaceIds = workspaces.map(ws => ws.id)
+  let workspaces = getWorkspaces()
+  let validWorkspaceIds = workspaces.map(ws => ws.id)
 
   if (workspaces.length === 0) {
-    // No workspaces configured - create window without workspace (will show onboarding)
-    windowManager.createWindow({ workspaceId: '' })
+    // No workspaces configured - auto-create default workspace (internal OpenCode use)
+    const { ensureDefaultWorkspace } = await import('@craft-agent/shared/config')
+    const defaultWorkspace = ensureDefaultWorkspace()
+    workspaces = [defaultWorkspace]
+    validWorkspaceIds = [defaultWorkspace.id]
+    windowManager.createWindow({ workspaceId: defaultWorkspace.id })
     return
   }
 

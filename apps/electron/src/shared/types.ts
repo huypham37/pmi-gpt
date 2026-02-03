@@ -525,6 +525,7 @@ export const IPC_CHANNELS = {
   GET_WORKSPACES: 'workspaces:get',
   CREATE_WORKSPACE: 'workspaces:create',
   CHECK_WORKSPACE_SLUG: 'workspaces:checkSlug',
+  ENSURE_DEFAULT_WORKSPACE: 'workspaces:ensureDefault',
 
   // Window management
   GET_WINDOW_WORKSPACE: 'window:getWorkspace',
@@ -644,7 +645,7 @@ export const IPC_CHANNELS = {
   SOURCES_START_OAUTH: 'sources:startOAuth',
   SOURCES_SAVE_CREDENTIALS: 'sources:saveCredentials',
   SOURCES_CHANGED: 'sources:changed',
-  
+
   // Source permissions config
   SOURCES_GET_PERMISSIONS: 'sources:getPermissions',
   // Workspace permissions config (for Explore mode)
@@ -796,6 +797,7 @@ export interface ElectronAPI {
   getWorkspaces(): Promise<Workspace[]>
   createWorkspace(folderPath: string, name: string): Promise<Workspace>
   checkWorkspaceSlug(slug: string): Promise<{ exists: boolean; path: string }>
+  ensureDefaultWorkspace(): Promise<Workspace>
 
   // Window management
   getWindowWorkspace(): Promise<string | null>
