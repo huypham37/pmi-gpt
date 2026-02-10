@@ -58,7 +58,7 @@ import { useOptionalAppShellContext } from '@/context/AppShellContext'
 import { EditPopover, getEditConfig } from '@/components/ui/EditPopover'
 import { SourceAvatar } from '@/components/ui/source-avatar'
 import { FreeFormInputContextBadge } from './FreeFormInputContextBadge'
-import type { FileAttachment, LoadedSource, LoadedSkill } from '../../../../shared/types'
+import type { FileAttachment, LoadedSource, LoadedSkill, AgentProfile } from '../../../../shared/types'
 import type { PermissionMode } from '@craft-agent/shared/agent/modes'
 import { PERMISSION_MODE_ORDER } from '@craft-agent/shared/agent/modes'
 import { type ThinkingLevel, THINKING_LEVELS, getThinkingLevelName } from '@craft-agent/shared/agent/thinking-levels'
@@ -120,6 +120,11 @@ export interface FreeFormInputProps {
   currentModel: string
   /** Callback when model changes */
   onModelChange: (model: string) => void
+  // Profile selection
+  /** Current agent profile ('chat', 'agent', 'testcase') */
+  profile?: AgentProfile
+  /** Callback when profile changes */
+  onProfileChange?: (profile: AgentProfile) => void
   // Thinking level (session-level setting)
   /** Current thinking level ('off', 'think', 'max') */
   thinkingLevel?: ThinkingLevel
@@ -208,6 +213,8 @@ export function FreeFormInput({
   inputRef: externalInputRef,
   currentModel,
   onModelChange,
+  profile = 'chat',
+  onProfileChange,
   thinkingLevel = 'think',
   onThinkingLevelChange,
   ultrathinkEnabled = false,
@@ -330,6 +337,7 @@ export function FreeFormInput({
   const [isFocused, setIsFocused] = React.useState(false)
   const [inputMaxHeight, setInputMaxHeight] = React.useState(540)
   const [modelDropdownOpen, setModelDropdownOpen] = React.useState(false)
+  const [profileDropdownOpen, setProfileDropdownOpen] = React.useState(false)
 
   // Input settings (loaded from config)
   const [autoCapitalisation, setAutoCapitalisation] = React.useState(true)
@@ -1509,8 +1517,54 @@ export function FreeFormInput({
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Right side: Model + Send - never shrink so they're always visible */}
+          {/* Right side: Profile + Model + Send - never shrink so they're always visible */}
           <div className="flex items-center shrink-0">
+          {/* 4.5. Profile Selector - Hidden in compact mode */}
+          {!compactMode && onProfileChange && (
+          <DropdownMenu open={profileDropdownOpen} onOpenChange={setProfileDropdownOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center h-7 px-1.5 gap-0.5 text-[13px] shrink-0 rounded-[6px] hover:bg-foreground/5 transition-colors select-none",
+                      profileDropdownOpen && "bg-foreground/5"
+                    )}
+                  >
+                    {profile === 'chat' ? 'Chat' : profile === 'agent' ? 'Agent' : 'Testcase'}
+                    <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Profile</TooltipContent>
+            </Tooltip>
+            <StyledDropdownMenuContent side="top" align="end" sideOffset={8} className="min-w-[200px]">
+              {([
+                { id: 'chat' as const, name: 'Chat', description: 'Conversational assistant' },
+                { id: 'agent' as const, name: 'Agent', description: 'Agentic with tool access' },
+                { id: 'testcase' as const, name: 'Testcase', description: 'Test case generation' },
+              ]).map((p) => {
+                const isSelected = profile === p.id
+                return (
+                  <StyledDropdownMenuItem
+                    key={p.id}
+                    onSelect={() => onProfileChange(p.id)}
+                    className="flex items-center justify-between px-2 py-2 rounded-lg cursor-pointer"
+                  >
+                    <div className="text-left">
+                      <div className="font-medium text-sm">{p.name}</div>
+                      <div className="text-xs text-muted-foreground">{p.description}</div>
+                    </div>
+                    {isSelected && (
+                      <Check className="h-4 w-4 text-foreground shrink-0 ml-3" />
+                    )}
+                  </StyledDropdownMenuItem>
+                )
+              })}
+            </StyledDropdownMenuContent>
+          </DropdownMenu>
+          )}
           {/* 5. Model Selector - Hidden in compact mode (EditPopover embedding) */}
           {!compactMode && (
           <DropdownMenu open={modelDropdownOpen} onOpenChange={setModelDropdownOpen}>

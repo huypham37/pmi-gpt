@@ -37,6 +37,7 @@ import {
   handleWorkingDirectoryChanged,
   handlePermissionModeChanged,
   handleSessionModelChanged,
+  handleSessionProfileChanged,
   handleUserMessage,
   handleSessionShared,
   handleSessionUnshared,
@@ -130,6 +131,9 @@ export function processEvent(
 
     case 'session_model_changed':
       return handleSessionModelChanged(state, event)
+
+    case 'session_profile_changed':
+      return handleSessionProfileChanged(state, event)
 
     case 'sources_changed':
       return handleSourcesChanged(state, event)

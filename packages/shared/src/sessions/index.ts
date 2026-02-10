@@ -17,6 +17,7 @@ export type {
   StoredSession,
   SessionMetadata,
   SessionHeader,
+  AgentProfile,
 } from './types.ts';
 
 // Storage functions

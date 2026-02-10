@@ -5,7 +5,7 @@
  * All agent events flow through a single pure function for consistent state transitions.
  */
 
-import type { Session, Message, PermissionRequest, CredentialRequest, TypedError, PermissionMode, TodoState, AuthRequest, ToolDisplayMeta } from '../../shared/types'
+import type { Session, Message, PermissionRequest, CredentialRequest, TypedError, PermissionMode, TodoState, AuthRequest, ToolDisplayMeta, AgentProfile } from '../../shared/types'
 
 /**
  * Streaming state for a session - replaces streamingTextRef
@@ -268,6 +268,15 @@ export interface SessionModelChangedEvent {
 }
 
 /**
+ * Session profile changed event
+ */
+export interface SessionProfileChangedEvent {
+  type: 'session_profile_changed'
+  sessionId: string
+  profile: AgentProfile
+}
+
+/**
  * Credential request event - prompts user for credentials
  */
 export interface CredentialRequestEvent {
@@ -417,6 +426,7 @@ export type AgentEvent =
   | WorkingDirectoryChangedEvent
   | PermissionModeChangedEvent
   | SessionModelChangedEvent
+  | SessionProfileChangedEvent
   | TaskBackgroundedEvent
   | ShellBackgroundedEvent
   | TaskProgressEvent

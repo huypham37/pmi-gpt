@@ -79,6 +79,7 @@ export function readSessionJsonl(sessionFile: string): StoredSession | null {
       messages,
       tokenUsage: header.tokenUsage,
       hidden: header.hidden,
+      profile: header.profile,
     };
   } catch (error) {
     debug('[jsonl] Failed to read session:', sessionFile, error);
@@ -144,6 +145,7 @@ export function createSessionHeader(session: StoredSession): SessionHeader {
     lastFinalMessageId: extractLastFinalMessageId(session.messages),
     // Hidden flag for mini-agent sessions (not shown in session list)
     hidden: session.hidden,
+    profile: session.profile,
   };
 }
 

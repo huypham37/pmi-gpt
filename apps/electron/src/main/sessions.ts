@@ -2,10 +2,11 @@ import { app } from 'electron'
 import * as Sentry from '@sentry/electron/main'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import { rm, readFile } from 'fs/promises'
-import { CraftAgent, type AgentEvent, setPermissionMode, type PermissionMode, unregisterSessionScopedToolCallbacks, AbortReason, type AuthRequest, type AuthResult, type CredentialAuthRequest } from '@craft-agent/shared/agent'
+import { rm, readFile, mkdir } from 'fs/promises'
+import { type PermissionMode, type AuthRequest, type AuthResult, type CredentialAuthRequest } from '@craft-agent/shared/agent'
+import { ACPClient, ACPSession, PermissionRequest as ACPPermissionRequest, type SessionUpdate, type ToolCall as ACPToolCall } from '@craft-agent/acp-client'
+import { ClientCapabilitiesPresets } from '@craft-agent/acp-client'
 import { sessionLog, isDebugMode, getLogFilePath } from './logger'
-import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
 import type { WindowManager } from './window-manager'
 import {
   loadStoredConfig,
@@ -36,11 +37,13 @@ import {
   type StoredMessage,
   type SessionMetadata,
   type TodoState,
+  type AgentProfile,
 } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, SERVER_BUILD_ERRORS } from '@craft-agent/shared/sources'
 import { ConfigWatcher, type ConfigWatcherCallbacks } from '@craft-agent/shared/config'
 import { getAuthState } from '@craft-agent/shared/auth'
-import { setAnthropicOptionsEnv, setPathToClaudeCodeExecutable, setInterceptorPath, setExecutable } from '@craft-agent/shared/agent'
+// ACP replaces the SDK agent - these are no longer needed:
+// import { setAnthropicOptionsEnv, setPathToClaudeCodeExecutable, setInterceptorPath, setExecutable } from '@craft-agent/shared/agent'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { CraftMcpClient } from '@craft-agent/shared/mcp'
 import { type Session, type Message, type SessionEvent, type FileAttachment, type StoredAttachment, type SendMessageOptions, IPC_CHANNELS, generateMessageId } from '../shared/types'
@@ -264,7 +267,7 @@ function resolveToolDisplayMeta(
 interface ManagedSession {
   id: string
   workspace: Workspace
-  agent: CraftAgent | null  // Lazy-loaded - null until first message
+  acpSession: ACPSession | null  // Lazy-loaded - null until first message
   messages: Message[]
   isProcessing: boolean
   lastMessageAt: number
@@ -366,6 +369,10 @@ interface ManagedSession {
   authRetryInProgress?: boolean
   // Whether this session is hidden from session list (e.g., mini edit sessions)
   hidden?: boolean
+  // Agent profile for this session (chat, agent, testcase) - defaults to 'chat'
+  profile?: AgentProfile
+  // Pending ACP permission request (for responding to permission prompts)
+  pendingACPPermissionRequest?: ACPPermissionRequest
 }
 
 // Convert runtime Message to StoredMessage for persistence
@@ -480,6 +487,8 @@ interface PendingDelta {
 export class SessionManager {
   private sessions: Map<string, ManagedSession> = new Map()
   private windowManager: WindowManager | null = null
+  /** ACP client for communicating with the OpenCode subprocess */
+  private acpClient: ACPClient | null = null
   // Delta batching for performance - reduces IPC events from 50+/sec to ~20/sec
   private pendingDeltas: Map<string, PendingDelta> = new Map()
   private deltaFlushTimers: Map<string, NodeJS.Timeout> = new Map()
@@ -694,27 +703,8 @@ export class SessionManager {
    * If agent is null (session hasn't sent any messages), skip - fresh build happens on next message.
    */
   private async reloadSessionSources(managed: ManagedSession): Promise<void> {
-    if (!managed.agent) return  // No agent = nothing to update (fresh build on next message)
-
-    const workspaceRootPath = managed.workspace.rootPath
-    sessionLog.info(`Reloading sources for session ${managed.id}`)
-
-    // Reload all sources from disk (craft-agents-docs is always available as MCP server)
-    const allSources = loadAllSources(workspaceRootPath)
-    managed.agent.setAllSources(allSources)
-
-    // Rebuild MCP and API servers for session's enabled sources
-    const enabledSlugs = managed.enabledSourceSlugs || []
-    const enabledSources = allSources.filter(s =>
-      enabledSlugs.includes(s.config.slug) && s.config.enabled && s.config.isAuthenticated
-    )
-    // Pass session path so large API responses can be saved to session folder
-    const sessionPath = getSessionStoragePath(workspaceRootPath, managed.id)
-    const { mcpServers, apiServers } = await buildServersFromSources(enabledSources, sessionPath)
-    const intendedSlugs = enabledSources.map(s => s.config.slug)
-    managed.agent.setSourceServers(mcpServers, apiServers, intendedSlugs)
-
-    sessionLog.info(`Sources reloaded for session ${managed.id}: ${Object.keys(mcpServers).length} MCP, ${Object.keys(apiServers).length} API`)
+    // ACP: Sources are managed by the server, no client-side reload needed
+    sessionLog.info(`Source reload requested for session ${managed.id} (no-op with ACP)`)
   }
 
   /**
@@ -774,68 +764,53 @@ export class SessionManager {
   }
 
   async initialize(): Promise<void> {
-    // Set path to Claude Code executable (cli.js from SDK)
-    // In packaged app: use app.getAppPath() (points to app folder, ASAR is disabled)
-    // In development: use process.cwd()
     const basePath = app.isPackaged ? app.getAppPath() : process.cwd()
 
-    // In monorepos, dependencies may be hoisted to the root node_modules
-    // Try local first, then check monorepo root (two levels up from apps/electron)
-    const sdkRelativePath = join('node_modules', '@anthropic-ai', 'claude-agent-sdk', 'cli.js')
-    let cliPath = join(basePath, sdkRelativePath)
-    if (!existsSync(cliPath) && !app.isPackaged) {
-      // Try monorepo root (../../node_modules from apps/electron)
-      const monorepoRoot = join(basePath, '..', '..')
-      cliPath = join(monorepoRoot, sdkRelativePath)
-    }
-    if (!existsSync(cliPath)) {
-      const error = `Claude Code SDK not found at ${cliPath}. The app package may be corrupted.`
-      sessionLog.error(error)
-      throw new Error(error)
-    }
-    sessionLog.info('Setting pathToClaudeCodeExecutable:', cliPath)
-    setPathToClaudeCodeExecutable(cliPath)
+    // Resolve the OpenCode executable for the ACP subprocess
+    // In development: use the opencode binary from node_modules or PATH
+    const opencodeBin = process.platform === 'win32' ? 'opencode.exe' : 'opencode'
+    let opencodeExecutable = opencodeBin  // Fallback to PATH
 
-    // Set path to fetch interceptor for SDK subprocess
-    // This interceptor captures API errors and adds metadata to MCP tool schemas
-    // In monorepos, packages may be at the root level, not inside apps/electron
-    const interceptorRelativePath = join('packages', 'shared', 'src', 'network-interceptor.ts')
-    let interceptorPath = join(basePath, interceptorRelativePath)
-    if (!existsSync(interceptorPath) && !app.isPackaged) {
-      // Try monorepo root (../../packages from apps/electron)
-      const monorepoRoot = join(basePath, '..', '..')
-      interceptorPath = join(monorepoRoot, interceptorRelativePath)
-    }
-    if (!existsSync(interceptorPath)) {
-      const error = `Network interceptor not found at ${interceptorPath}. The app package may be corrupted.`
-      sessionLog.error(error)
-      throw new Error(error)
-    }
-    // Set interceptor path (used for --preload flag with bun)
-    sessionLog.info('Setting interceptorPath:', interceptorPath)
-    setInterceptorPath(interceptorPath)
-
-    // In packaged app: use bundled Bun binary
-    // In development: use system 'bun' command
     if (app.isPackaged) {
-      // Use platform-specific binary name (bun.exe on Windows, bun on macOS/Linux)
       const bunBinary = process.platform === 'win32' ? 'bun.exe' : 'bun'
-      // On Windows, bun.exe is in extraResources (process.resourcesPath) to avoid EBUSY errors.
-      // On macOS/Linux, bun is in the app files (basePath). See electron-builder.yml for details.
       const bunBasePath = process.platform === 'win32' ? process.resourcesPath : basePath
       const bunPath = join(bunBasePath, 'vendor', 'bun', bunBinary)
-      if (!existsSync(bunPath)) {
-        const error = `Bundled Bun runtime not found at ${bunPath}. The app package may be corrupted.`
-        sessionLog.error(error)
-        throw new Error(error)
+      if (existsSync(bunPath)) {
+        opencodeExecutable = bunPath
       }
-      sessionLog.info('Setting executable:', bunPath)
-      setExecutable(bunPath)
     }
-    // In development: use system 'bun' (works on Windows now, supports --preload for interceptor)
 
-    // Set up authentication environment variables (critical for SDK to work)
-    await this.reinitializeAuth()
+    // Create and start the ACP client
+    // Default working directory to a temp directory in project root
+    const defaultCwd = join(__dirname, '..', '..', 'temp-workspace')
+    
+    // Create the temp workspace directory if it doesn't exist
+    if (!existsSync(defaultCwd)) {
+      await mkdir(defaultCwd, { recursive: true })
+      sessionLog.info(`Created temp workspace directory: ${defaultCwd}`)
+    }
+    
+    this.acpClient = new ACPClient({
+      executable: opencodeExecutable,
+      arguments: ['acp'],
+      workingDirectory: defaultCwd,
+      clientInfo: {
+        name: 'craft-agent',
+        title: 'Craft Agents',
+        version: app.getVersion(),
+      },
+      capabilities: ClientCapabilitiesPresets.full,
+    })
+
+    try {
+      await this.acpClient.start()
+      sessionLog.info('ACP client started successfully')
+      sessionLog.info('Agent info:', JSON.stringify(this.acpClient.agentInfo))
+    } catch (error) {
+      sessionLog.error('Failed to start ACP client:', error)
+      // Don't throw - allow app to start even if ACP subprocess fails
+      // Users will see errors when they try to send messages
+    }
 
     // Load existing sessions from disk
     this.loadSessionsFromDisk()
@@ -862,7 +837,7 @@ export class SessionManager {
           const managed: ManagedSession = {
             id: meta.id,
             workspace,
-            agent: null,  // Lazy-load agent when needed
+            acpSession: null,  // Lazy-load ACP session when needed
             messages: [],  // Lazy-load messages when needed
             isProcessing: false,
             lastMessageAt: meta.lastMessageAt ?? meta.lastUsedAt,  // Fallback for sessions saved before lastMessageAt was persisted
@@ -894,6 +869,7 @@ export class SessionManager {
             sharedUrl: meta.sharedUrl,
             sharedId: meta.sharedId,
             hidden: meta.hidden,
+            profile: meta.profile,
           }
 
           this.sessions.set(meta.id, managed)
@@ -944,6 +920,7 @@ export class SessionManager {
           costUsd: 0,
         },
         hidden: managed.hidden,
+        profile: managed.profile,
       }
 
       // Queue for async persistence with debouncing
@@ -1202,10 +1179,7 @@ export class SessionManager {
       const { markSourceAuthenticated } = await import('@craft-agent/shared/sources')
       markSourceAuthenticated(managed.workspace.rootPath, request.sourceSlug)
 
-      // Mark source as unseen so fresh guide is injected on next message
-      if (managed.agent) {
-        managed.agent.markSourceUnseen(request.sourceSlug)
-      }
+      // ACP: Source guide management handled by server
 
       await this.completeAuthRequest(sessionId, {
         requestId,
@@ -1422,7 +1396,7 @@ export class SessionManager {
     const managed: ManagedSession = {
       id: storedSession.id,
       workspace,
-      agent: null,  // Lazy-load agent on first message
+      acpSession: null,  // Lazy-load ACP session on first message
       messages: [],
       isProcessing: false,
       lastMessageAt: storedSession.lastMessageAt ?? storedSession.lastUsedAt,  // Fallback for sessions saved before lastMessageAt was persisted
@@ -1469,305 +1443,35 @@ export class SessionManager {
   /**
    * Get or create agent for a session (lazy loading)
    */
-  private async getOrCreateAgent(managed: ManagedSession): Promise<CraftAgent> {
-    if (!managed.agent) {
-      const end = perf.start('agent.create', { sessionId: managed.id })
+  private async getOrCreateACPSession(managed: ManagedSession): Promise<ACPSession> {
+    if (!managed.acpSession) {
+      if (!this.acpClient) {
+        throw new Error('ACP client not initialized. Call initialize() first.')
+      }
+      const end = perf.start('acpSession.create', { sessionId: managed.id })
       const config = loadStoredConfig()
-      managed.agent = new CraftAgent({
-        workspace: managed.workspace,
-        // Session model takes priority, fallback to global config, then resolve with customModel override
-        model: resolveModelId(managed.model || config?.model || DEFAULT_MODEL),
-        // Initialize thinking level at construction to avoid race conditions
-        thinkingLevel: managed.thinkingLevel,
-        isHeadless: !AGENT_FLAGS.defaultModesEnabled,
-        // System prompt preset for mini agents (focused prompts for quick edits)
-        systemPromptPreset: managed.systemPromptPreset,
-        // Always pass session object - id is required for plan mode callbacks
-        // sdkSessionId is optional and used for conversation resumption
-        session: {
-          id: managed.id,
-          workspaceRootPath: managed.workspace.rootPath,
-          sdkSessionId: managed.sdkSessionId,
-          createdAt: managed.lastMessageAt,
-          lastUsedAt: managed.lastMessageAt,
-          workingDirectory: managed.workingDirectory,
-          sdkCwd: managed.sdkCwd,
-          model: managed.model,
-        },
-        // Critical: Immediately persist SDK session ID when captured to prevent loss on crash.
-        // Without this, the ID is only saved via debounced persistSession() which may not
-        // complete before app crash/quit, causing session resumption to fail.
-        onSdkSessionIdUpdate: (sdkSessionId: string) => {
-          managed.sdkSessionId = sdkSessionId
-          sessionLog.info(`SDK session ID captured for ${managed.id}: ${sdkSessionId}`)
-          // Persist immediately and flush - critical for resumption reliability
-          this.persistSession(managed)
-          sessionPersistenceQueue.flush(managed.id)
-        },
-        // Called when SDK session ID is cleared after failed resume (empty response recovery)
-        onSdkSessionIdCleared: () => {
-          managed.sdkSessionId = undefined
-          sessionLog.info(`SDK session ID cleared for ${managed.id} (resume recovery)`)
-          // Persist immediately to prevent repeated resume attempts
-          this.persistSession(managed)
-          sessionPersistenceQueue.flush(managed.id)
-        },
-        // Called to get recent messages for recovery context when resume fails.
-        // Returns last 6 messages (3 exchanges) of user/assistant content.
-        getRecoveryMessages: () => {
-          const relevantMessages = managed.messages
-            .filter(m => m.role === 'user' || m.role === 'assistant')
-            .filter(m => !m.isIntermediate)  // Skip intermediate assistant messages
-            .slice(-6);  // Last 6 messages (3 exchanges)
+      // Create a new ACP session (the server owns tools/prompts/behavior)
+      managed.acpSession = await this.acpClient.newSession()
+      sessionLog.info(`Created ACP session for ${managed.id}: acpSessionId=${managed.acpSession.id}`)
 
-          return relevantMessages.map(m => ({
-            type: m.role as 'user' | 'assistant',
-            content: m.content,
-          }));
-        },
-        // Debug mode - enables log file path injection into system prompt
-        debugMode: isDebugMode ? {
-          enabled: true,
-          logFilePath: getLogFilePath(),
-        } : undefined,
-      })
-      sessionLog.info(`Created agent for session ${managed.id}${managed.sdkSessionId ? ' (resuming)' : ''}`)
-
-      // Set up permission handler to forward requests to renderer
-      managed.agent.onPermissionRequest = (request) => {
-        sessionLog.info(`Permission request for session ${managed.id}:`, request.command)
-        this.sendEvent({
-          type: 'permission_request',
-          sessionId: managed.id,
-          request: {
-            ...request,
-            sessionId: managed.id,
-          }
-        }, managed.workspace.id)
+      // Set model if session has a specific model override
+      const resolvedModel = resolveModelId(managed.model || config?.model || DEFAULT_MODEL)
+      try {
+        await managed.acpSession.setModel(resolvedModel)
+      } catch (e) {
+        sessionLog.warn(`Failed to set model ${resolvedModel}:`, e)
       }
 
-      // Note: Credential requests now flow through onAuthRequest (unified auth flow)
-      // The legacy onCredentialRequest callback has been removed from CraftAgent
-      // Auth refresh for mid-session token expiry is handled by the error handler in sendMessage
-      // which destroys/recreates the agent to get fresh credentials
-
-      // Set up mode change handlers
-      managed.agent.onPermissionModeChange = (mode) => {
-        sessionLog.info(`Permission mode changed for session ${managed.id}:`, mode)
-        managed.permissionMode = mode
-        this.sendEvent({
-          type: 'permission_mode_changed',
-          sessionId: managed.id,
-          permissionMode: managed.permissionMode,
-        }, managed.workspace.id)
+      // Set mode to 'build' (default agentic mode with tool access)
+      try {
+        await managed.acpSession.setMode('build')
+      } catch (e) {
+        sessionLog.warn('Failed to set mode build:', e)
       }
 
-      // Wire up onPlanSubmitted to add plan message to conversation
-      managed.agent.onPlanSubmitted = async (planPath) => {
-        sessionLog.info(`Plan submitted for session ${managed.id}:`, planPath)
-        try {
-          // Read the plan file content
-          const planContent = await readFile(planPath, 'utf-8')
-
-          // Create a plan message
-          const planMessage = {
-            id: `plan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            role: 'plan' as const,
-            content: planContent,
-            timestamp: Date.now(),
-            planPath,
-          }
-
-          // Add to session messages
-          managed.messages.push(planMessage)
-
-          // Update lastMessageRole for badge display
-          managed.lastMessageRole = 'plan'
-
-          // Send event to renderer
-          this.sendEvent({
-            type: 'plan_submitted',
-            sessionId: managed.id,
-            message: planMessage,
-          }, managed.workspace.id)
-
-          // Force-abort execution - plan presentation is a stopping point
-          // The user needs to review and respond before continuing
-          if (managed.isProcessing && managed.agent) {
-            sessionLog.info(`Force-aborting after plan submission for session ${managed.id}`)
-            managed.agent.forceAbort(AbortReason.PlanSubmitted)
-            managed.isProcessing = false
-
-            // Send complete event so renderer knows processing stopped (include tokenUsage for real-time updates)
-            this.sendEvent({ type: 'complete', sessionId: managed.id, tokenUsage: managed.tokenUsage }, managed.workspace.id)
-
-            // Persist session state
-            this.persistSession(managed)
-          }
-        } catch (error) {
-          sessionLog.error(`Failed to read plan file:`, error)
-        }
-      }
-
-      // Wire up onAuthRequest to add auth message to conversation and pause execution
-      managed.agent.onAuthRequest = (request) => {
-        sessionLog.info(`Auth request for session ${managed.id}:`, request.type, request.sourceSlug)
-
-        // Create auth-request message
-        const authMessage: Message = {
-          id: generateMessageId(),
-          role: 'auth-request',
-          content: this.getAuthRequestDescription(request),
-          timestamp: Date.now(),
-          authRequestId: request.requestId,
-          authRequestType: request.type,
-          authSourceSlug: request.sourceSlug,
-          authSourceName: request.sourceName,
-          authStatus: 'pending',
-          // Copy type-specific fields for credentials
-          ...(request.type === 'credential' && {
-            authCredentialMode: request.mode,
-            authLabels: request.labels,
-            authDescription: request.description,
-            authHint: request.hint,
-            authHeaderName: request.headerName,
-            authSourceUrl: request.sourceUrl,
-            authPasswordRequired: request.passwordRequired,
-          }),
-        }
-
-        // Add to session messages
-        managed.messages.push(authMessage)
-
-        // Store pending auth request for later resolution
-        managed.pendingAuthRequestId = request.requestId
-        managed.pendingAuthRequest = request
-
-        // Force-abort execution (like SubmitPlan)
-        if (managed.isProcessing && managed.agent) {
-          sessionLog.info(`Force-aborting after auth request for session ${managed.id}`)
-          managed.agent.forceAbort(AbortReason.AuthRequest)
-          managed.isProcessing = false
-
-          // Send complete event so renderer knows processing stopped (include tokenUsage for real-time updates)
-          this.sendEvent({ type: 'complete', sessionId: managed.id, tokenUsage: managed.tokenUsage }, managed.workspace.id)
-        }
-
-        // Emit auth_request event to renderer
-        this.sendEvent({
-          type: 'auth_request',
-          sessionId: managed.id,
-          message: authMessage,
-          request: request,
-        }, managed.workspace.id)
-
-        // Persist session state
-        this.persistSession(managed)
-
-        // OAuth flow is now user-initiated via startSessionOAuth()
-        // The UI will call sessionCommand({ type: 'startOAuth' }) when user clicks "Sign in"
-      }
-
-      // Wire up onSourceActivationRequest to auto-enable sources when agent tries to use them
-      managed.agent.onSourceActivationRequest = async (sourceSlug: string): Promise<boolean> => {
-        sessionLog.info(`Source activation request for session ${managed.id}:`, sourceSlug)
-
-        const workspaceRootPath = managed.workspace.rootPath
-
-        // Check if source is already enabled
-        if (managed.enabledSourceSlugs?.includes(sourceSlug)) {
-          sessionLog.info(`Source ${sourceSlug} already in enabledSourceSlugs, checking server status`)
-          // Source is in the list but server might not be active (e.g., build failed previously)
-        }
-
-        // Load the source to check if it exists and is ready
-        const sources = getSourcesBySlugs(workspaceRootPath, [sourceSlug])
-        if (sources.length === 0) {
-          sessionLog.warn(`Source ${sourceSlug} not found in workspace`)
-          return false
-        }
-
-        const source = sources[0]
-
-        // Check if source is enabled at workspace level
-        if (!source.config.enabled) {
-          sessionLog.warn(`Source ${sourceSlug} is disabled at workspace level`)
-          return false
-        }
-
-        // Check if source is authenticated (if it requires auth)
-        if (!source.config.isAuthenticated) {
-          sessionLog.warn(`Source ${sourceSlug} requires authentication`)
-          return false
-        }
-
-        // Track whether we added this slug (for rollback on failure)
-        const slugSet = new Set(managed.enabledSourceSlugs || [])
-        const wasAlreadyEnabled = slugSet.has(sourceSlug)
-
-        // Add to enabled sources if not already there
-        if (!wasAlreadyEnabled) {
-          slugSet.add(sourceSlug)
-          managed.enabledSourceSlugs = Array.from(slugSet)
-          sessionLog.info(`Added source ${sourceSlug} to session enabled sources`)
-        }
-
-        // Build server configs for all enabled sources
-        const allEnabledSources = getSourcesBySlugs(workspaceRootPath, managed.enabledSourceSlugs || [])
-        // Pass session path so large API responses can be saved to session folder
-        const sessionPath = getSessionStoragePath(workspaceRootPath, managed.id)
-        const { mcpServers, apiServers, errors } = await buildServersFromSources(allEnabledSources, sessionPath)
-
-        if (errors.length > 0) {
-          sessionLog.warn(`Source build errors during auto-enable:`, errors)
-        }
-
-        // Check if our target source was built successfully
-        const sourceBuilt = sourceSlug in mcpServers || sourceSlug in apiServers
-        if (!sourceBuilt) {
-          sessionLog.warn(`Source ${sourceSlug} failed to build`)
-          // Only remove if WE added it (not if it was already there)
-          if (!wasAlreadyEnabled) {
-            slugSet.delete(sourceSlug)
-            managed.enabledSourceSlugs = Array.from(slugSet)
-          }
-          return false
-        }
-
-        // Apply source servers to the agent
-        const intendedSlugs = allEnabledSources
-          .filter(s => s.config.enabled && s.config.isAuthenticated)
-          .map(s => s.config.slug)
-        managed.agent!.setSourceServers(mcpServers, apiServers, intendedSlugs)
-
-        sessionLog.info(`Auto-enabled source ${sourceSlug} for session ${managed.id}`)
-
-        // Persist session with updated enabled sources
-        this.persistSession(managed)
-
-        // Notify renderer of source change
-        this.sendEvent({
-          type: 'sources_changed',
-          sessionId: managed.id,
-          enabledSourceSlugs: managed.enabledSourceSlugs || [],
-        }, managed.workspace.id)
-
-        return true
-      }
-
-      // NOTE: Source reloading is now handled by ConfigWatcher callbacks
-      // which detect filesystem changes and update all affected sessions.
-      // See setupConfigWatcher() for the full reload logic.
-
-      // Apply session-scoped permission mode to the newly created agent
-      // This ensures the UI toggle state is reflected in the agent before first message
-      if (managed.permissionMode) {
-        setPermissionMode(managed.id, managed.permissionMode)
-        sessionLog.info(`Applied permission mode '${managed.permissionMode}' to agent for session ${managed.id}`)
-      }
       end()
     }
-    return managed.agent
+    return managed.acpSession
   }
 
   async flagSession(sessionId: string): Promise<void> {
@@ -2048,25 +1752,7 @@ export class SessionManager {
     // Store the selection
     managed.enabledSourceSlugs = sourceSlugs
 
-    // If agent exists, build and apply servers immediately
-    if (managed.agent) {
-      const sources = getSourcesBySlugs(workspaceRootPath, sourceSlugs)
-      // Pass session path so large API responses can be saved to session folder
-      const sessionPath = getSessionStoragePath(workspaceRootPath, sessionId)
-      const { mcpServers, apiServers, errors } = await buildServersFromSources(sources, sessionPath)
-      if (errors.length > 0) {
-        sessionLog.warn(`Source build errors:`, errors)
-      }
-
-      // Set all sources for context (agent sees full list with descriptions, including built-ins)
-      const allSources = loadAllSources(workspaceRootPath)
-      managed.agent.setAllSources(allSources)
-
-      // Set active source servers (tools are only available from these)
-      const intendedSlugs = sources.filter(s => s.config.enabled && s.config.isAuthenticated).map(s => s.config.slug)
-      managed.agent.setSourceServers(mcpServers, apiServers, intendedSlugs)
-      sessionLog.info(`Applied ${Object.keys(mcpServers).length} MCP + ${Object.keys(apiServers).length} API sources to active agent (${allSources.length} total)`)
-    }
+    // ACP: Sources are managed by the server, no client-side server building needed
 
     // Persist the session with updated sources
     this.persistSession(managed)
@@ -2277,10 +1963,7 @@ export class SessionManager {
     const managed = this.sessions.get(sessionId)
     if (managed) {
       managed.workingDirectory = path
-      // Also update the agent's session config if agent exists
-      if (managed.agent) {
-        managed.agent.updateWorkingDirectory(path)
-      }
+      // ACP: Working directory is set at session creation, not updated mid-session
       this.persistSession(managed)
       // Notify renderer of the working directory change
       this.sendEvent({ type: 'working_directory_changed', sessionId, workingDirectory: path }, managed.workspace.id)
@@ -2297,13 +1980,14 @@ export class SessionManager {
       managed.model = model ?? undefined
       // Persist to disk
       await updateSessionMetadata(managed.workspace.rootPath, sessionId, { model: model ?? undefined })
-      // Update agent model if it already exists (takes effect on next query)
-      if (managed.agent) {
-        // Fallback chain: session model > workspace default > global config > DEFAULT_MODEL
+      // Update ACP session model if it already exists
+      if (managed.acpSession) {
         const wsConfig = loadWorkspaceConfig(managed.workspace.rootPath)
         const effectiveModel = model ?? wsConfig?.defaults?.model ?? loadStoredConfig()?.model ?? DEFAULT_MODEL
         const resolvedModel = resolveModelId(effectiveModel)
-        managed.agent.setModel(resolvedModel)
+        managed.acpSession.setModel(resolvedModel).catch(e => {
+          sessionLog.warn(`Failed to set model ${resolvedModel}:`, e)
+        })
       }
       // Notify renderer of the model change
       this.sendEvent({ type: 'session_model_changed', sessionId, model }, managed.workspace.id)
@@ -2346,8 +2030,8 @@ export class SessionManager {
     const workspaceRootPath = managed.workspace.rootPath
 
     // If processing is in progress, force-abort via Query.close() and wait for cleanup
-    if (managed.isProcessing && managed.agent) {
-      managed.agent.forceAbort(AbortReason.UserStop)
+    if (managed.isProcessing && managed.acpSession) {
+      managed.acpSession.cancel()
       // Brief wait for the query to finish tearing down before we delete session files.
       // Prevents file corruption from overlapping writes during rapid delete operations.
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -2364,13 +2048,8 @@ export class SessionManager {
     // Cancel any pending persistence write (session is being deleted, no need to save)
     sessionPersistenceQueue.cancel(sessionId)
 
-    // Clean up session-scoped tool callbacks to prevent memory accumulation
-    unregisterSessionScopedToolCallbacks(sessionId)
-
-    // Dispose agent to clean up ConfigWatchers, event listeners, MCP connections
-    if (managed.agent) {
-      managed.agent.dispose()
-    }
+    // Clean up ACP session reference (server manages its own cleanup)
+    managed.acpSession = null
 
     this.sessions.delete(sessionId)
 
@@ -2430,7 +2109,7 @@ export class SessionManager {
 
       // Force-abort via Query.close() - immediately stops processing.
       // The for-await loop will complete, triggering onProcessingStopped → queue drain.
-      managed.agent?.forceAbort(AbortReason.Redirect)
+      managed.acpSession?.cancel()
 
       return
     }
@@ -2544,185 +2223,61 @@ export class SessionManager {
     // Start perf span for entire sendMessage flow
     const sendSpan = perf.span('session.sendMessage', { sessionId })
 
-    // Get or create the agent (lazy loading)
-    const agent = await this.getOrCreateAgent(managed)
-    sendSpan.mark('agent.ready')
-
-    // Always set all sources for context (even if none are enabled), including built-ins
-    const workspaceRootPath = managed.workspace.rootPath
-    const allSources = loadAllSources(workspaceRootPath)
-    agent.setAllSources(allSources)
-    sendSpan.mark('sources.loaded')
-
-    // Apply source servers if any are enabled
-    if (managed.enabledSourceSlugs?.length) {
-      // Always build server configs fresh (no caching - single source of truth)
-      const sources = getSourcesBySlugs(workspaceRootPath, managed.enabledSourceSlugs)
-      // Pass session path so large API responses can be saved to session folder
-      const sessionPath = getSessionStoragePath(workspaceRootPath, sessionId)
-      const { mcpServers, apiServers, errors } = await buildServersFromSources(sources, sessionPath)
-      if (errors.length > 0) {
-        sessionLog.warn(`Source build errors:`, errors)
-      }
-
-      // Apply source servers to the agent
-      const mcpCount = Object.keys(mcpServers).length
-      const apiCount = Object.keys(apiServers).length
-      if (mcpCount > 0 || apiCount > 0 || managed.enabledSourceSlugs.length > 0) {
-        // Pass intended slugs so agent shows sources as active even if build failed
-        const intendedSlugs = sources.filter(s => s.config.enabled && s.config.isAuthenticated).map(s => s.config.slug)
-        agent.setSourceServers(mcpServers, apiServers, intendedSlugs)
-        sessionLog.info(`Applied ${mcpCount} MCP + ${apiCount} API sources to session ${sessionId} (${allSources.length} total)`)
-      }
-      sendSpan.mark('servers.applied')
-    }
+    // Get or create the ACP session (lazy loading)
+    const acpSession = await this.getOrCreateACPSession(managed)
+    sendSpan.mark('acpSession.ready')
 
     try {
       sessionLog.info('Starting chat for session:', sessionId)
-      sessionLog.info('Workspace:', JSON.stringify(managed.workspace, null, 2))
       sessionLog.info('Message:', message)
-      sessionLog.info('Agent model:', agent.getModel())
-      sessionLog.info('process.cwd():', process.cwd())
-
-      // Set ultrathink override if enabled (single-shot - resets after query)
-      // This boosts the session's thinkingLevel to 'max' for this message only
-      if (options?.ultrathinkEnabled) {
-        sessionLog.info('Ultrathink override ENABLED')
-        agent.setUltrathinkOverride(true)
-      }
-
-      // Process the message through the agent
-      sessionLog.info('Calling agent.chat()...')
-      if (attachments?.length) {
-        sessionLog.info('Attachments:', attachments.length)
-      }
-
-      // Skills mentioned via @mentions are handled by the SDK's Skill tool.
-      // The UI layer (extractBadges in mentions.ts) injects fully-qualified names
-      // in the rawText, and canUseTool in craft-agent.ts provides a fallback
-      // to qualify short names. No transformation needed here.
 
       sendSpan.mark('chat.starting')
-      const chatIterator = agent.chat(message, attachments)
-      sessionLog.info('Got chat iterator, starting iteration...')
+      const updateStream = acpSession.prompt(message)
+      sessionLog.info('Got ACP update stream, starting iteration...')
 
-      for await (const event of chatIterator) {
-        // Log events (skip noisy text_delta)
-        if (event.type !== 'text_delta') {
-          if (event.type === 'tool_start') {
-            sessionLog.info(`tool_start: ${event.toolName} (${event.toolUseId})`)
-          } else if (event.type === 'tool_result') {
-            sessionLog.info(`tool_result: ${event.toolUseId} isError=${event.isError}`)
-          } else {
-            sessionLog.info('Got event:', event.type)
-          }
+      for await (const update of updateStream) {
+        // Log updates (skip noisy text)
+        if (update.type !== 'text') {
+          sessionLog.info('Got ACP update:', update.type)
         }
 
-        // Process the event first
-        this.processEvent(managed, event)
-
-        // Fallback: Capture SDK session ID if the onSdkSessionIdUpdate callback didn't fire.
-        // Primary capture happens in getOrCreateAgent() via onSdkSessionIdUpdate callback,
-        // which immediately flushes to disk. This fallback handles edge cases where the
-        // callback might not fire (e.g., SDK version mismatch, callback not supported).
-        if (!managed.sdkSessionId) {
-          const sdkId = agent.getSessionId()
-          if (sdkId) {
-            managed.sdkSessionId = sdkId
-            sessionLog.info(`Captured SDK session ID via fallback: ${sdkId}`)
-            // Also flush here since we're in fallback mode
-            this.persistSession(managed)
-            sessionPersistenceQueue.flush(managed.id)
-          }
-        }
-
-        // Handle complete event - SDK always sends this (even after interrupt)
-        // This is the central place where processing ends
-        if (event.type === 'complete') {
-          // Skip normal completion handling if auth retry is in progress
-          // The retry will handle its own completion
-          if (managed.authRetryInProgress) {
-            sessionLog.info('Chat completed but auth retry is in progress, skipping normal completion handling')
-            sendSpan.mark('chat.complete.auth_retry_pending')
-            sendSpan.end()
-            return  // Exit function - retry will handle completion
-          }
-
-          sessionLog.info('Chat completed via complete event')
-
-          // Check if we got an assistant response in this turn
-          // If not, the SDK may have hit context limits or other issues
-          const lastAssistantMsg = [...managed.messages].reverse().find(m =>
-            m.role === 'assistant' && !m.isIntermediate
-          )
-          const lastUserMsg = [...managed.messages].reverse().find(m => m.role === 'user')
-
-          // If the last user message is newer than any assistant response, we got no reply
-          // This can happen due to context overflow or API issues - log for debugging but don't show UI warning
-          if (lastUserMsg && (!lastAssistantMsg || lastUserMsg.timestamp > lastAssistantMsg.timestamp)) {
-            sessionLog.warn(`Session ${sessionId} completed without assistant response - possible context overflow or API issue`)
-          }
-
-          sendSpan.mark('chat.complete')
-          sendSpan.end()
-          this.onProcessingStopped(sessionId, 'complete')
-          return  // Exit function, skip finally block (onProcessingStopped handles cleanup)
-        }
+        // Process the ACP update
+        this.processACPUpdate(managed, update)
 
         // Check if cancelled via cancelProcessing (Stop button)
-        // The SDK will still send a complete event, but we break early here
-        // since cancelProcessing already cleared the state
         if (!managed.isProcessing) {
-          sessionLog.info('Processing flag cleared, breaking out of event loop')
+          sessionLog.info('Processing flag cleared, breaking out of update loop')
           break
         }
       }
 
-      // Loop exited without complete event (shouldn't happen normally)
-      sessionLog.info('Chat loop exited unexpectedly')
+      // Finalize any streaming text into a complete message
+      this.finalizeStreamingText(managed)
+
+      // Stream completed - handle completion
+      sessionLog.info('ACP prompt stream completed')
+      sendSpan.mark('chat.complete')
+      sendSpan.end()
+      this.onProcessingStopped(sessionId, 'complete')
+      return  // Exit function, skip finally block
+
     } catch (error) {
-      // Check if this is an abort error (expected when interrupted)
-      const isAbortError = error instanceof Error && (
-        error.name === 'AbortError' ||
-        error.message === 'Request was aborted.' ||
-        error.message.includes('aborted')
-      )
+      sessionLog.error('Error in ACP chat:', error)
+      sessionLog.error('Error message:', error instanceof Error ? error.message : String(error))
 
-      if (isAbortError) {
-        // Extract abort reason if available (safety net for unexpected abort propagation)
-        const reason = (error as DOMException).cause as AbortReason | undefined
+      Sentry.captureException(error, {
+        tags: { errorSource: 'acp-chat', sessionId },
+      })
 
-        sessionLog.info(`Chat aborted (reason: ${reason || 'unknown'})`)
-        sendSpan.mark('chat.aborted')
-        sendSpan.setMetadata('abort_reason', reason || 'unknown')
-        sendSpan.end()
-
-        // Plan submissions handle their own cleanup (they set isProcessing = false directly).
-        // All other abort reasons route through onProcessingStopped for queue draining.
-        if (reason === AbortReason.UserStop || reason === AbortReason.Redirect || reason === undefined) {
-          this.onProcessingStopped(sessionId, 'interrupted')
-        }
-      } else {
-        sessionLog.error('Error in chat:', error)
-        sessionLog.error('Error message:', error instanceof Error ? error.message : String(error))
-        sessionLog.error('Error stack:', error instanceof Error ? error.stack : 'No stack')
-
-        // Report chat/SDK errors to Sentry for crash tracking
-        Sentry.captureException(error, {
-          tags: { errorSource: 'chat', sessionId },
-        })
-
-        sendSpan.mark('chat.error')
-        sendSpan.setMetadata('error', error instanceof Error ? error.message : String(error))
-        sendSpan.end()
-        this.sendEvent({
-          type: 'error',
-          sessionId,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }, managed.workspace.id)
-        // Handle error via centralized handler
-        this.onProcessingStopped(sessionId, 'error')
-      }
+      sendSpan.mark('chat.error')
+      sendSpan.setMetadata('error', error instanceof Error ? error.message : String(error))
+      sendSpan.end()
+      this.sendEvent({
+        type: 'error',
+        sessionId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, managed.workspace.id)
+      this.onProcessingStopped(sessionId, 'error')
     } finally {
       // Only handle cleanup for unexpected exits (loop break without complete event)
       // Normal completion returns early after calling onProcessingStopped
@@ -2747,9 +2302,9 @@ export class SessionManager {
     // Clear queue - user explicitly stopped, don't process queued messages
     managed.messageQueue = []
 
-    // Force-abort via Query.close() - immediately stops processing
-    if (managed.agent) {
-      managed.agent.forceAbort(AbortReason.UserStop)
+    // Cancel via ACP session
+    if (managed.acpSession) {
+      managed.acpSession.cancel()
     }
 
     // Set state immediately - the SDK will send a complete event
@@ -3001,12 +2556,34 @@ To view this task's output:
    */
   respondToPermission(sessionId: string, requestId: string, allowed: boolean, alwaysAllow: boolean): boolean {
     const managed = this.sessions.get(sessionId)
-    if (managed?.agent) {
+    if (managed?.pendingACPPermissionRequest) {
       sessionLog.info(`Permission response for ${requestId}: allowed=${allowed}, alwaysAllow=${alwaysAllow}`)
-      managed.agent.respondToPermission(requestId, allowed, alwaysAllow)
+      const permRequest = managed.pendingACPPermissionRequest
+      // Find the right option to respond with
+      const options = permRequest.options
+      let optionId: string | undefined
+      if (allowed) {
+        // Prefer always_allow if alwaysAllow is true, otherwise allow_once
+        const targetKind = alwaysAllow ? 'allow_always' : 'allow_once'
+        optionId = options.find(o => o.kind === targetKind)?.optionId
+          ?? options.find(o => o.kind === 'allow_once')?.optionId
+      } else {
+        optionId = options.find(o => o.kind === 'reject_once')?.optionId
+          ?? options.find(o => o.kind === 'reject_always')?.optionId
+      }
+      if (optionId) {
+        permRequest.respond(optionId).catch(e => {
+          sessionLog.warn('Failed to respond to ACP permission:', e)
+        })
+      } else {
+        permRequest.cancel().catch(e => {
+          sessionLog.warn('Failed to cancel ACP permission:', e)
+        })
+      }
+      managed.pendingACPPermissionRequest = undefined
       return true
     } else {
-      sessionLog.warn(`Cannot respond to permission - no agent for session ${sessionId}`)
+      sessionLog.warn(`Cannot respond to permission - no pending ACP permission for session ${sessionId}`)
       return false
     }
   }
@@ -3050,13 +2627,30 @@ To view this task's output:
       // Update permission mode
       managed.permissionMode = mode
 
-      // Update the mode state for this specific session via mode manager
-      setPermissionMode(sessionId, mode)
+      // ACP: Permission mode is managed by the server
 
       this.sendEvent({
         type: 'permission_mode_changed',
         sessionId: managed.id,
         permissionMode: mode,
+      }, managed.workspace.id)
+      // Persist to disk
+      this.persistSession(managed)
+    }
+  }
+
+  /**
+   * Set the agent profile for a session ('chat', 'agent', 'testcase')
+   */
+  setSessionProfile(sessionId: string, profile: AgentProfile): void {
+    const managed = this.sessions.get(sessionId)
+    if (managed) {
+      managed.profile = profile
+
+      this.sendEvent({
+        type: 'session_profile_changed',
+        sessionId: managed.id,
+        profile,
       }, managed.workspace.id)
       // Persist to disk
       this.persistSession(managed)
@@ -3092,10 +2686,7 @@ To view this task's output:
       // Update thinking level in managed session
       managed.thinkingLevel = level
 
-      // Update the agent's thinking level if it exists
-      if (managed.agent) {
-        managed.agent.setThinkingLevel(level)
-      }
+      // ACP: Thinking level is managed by the server via config options
 
       sessionLog.info(`Session ${sessionId}: thinking level set to ${level}`)
       // Persist to disk
@@ -3129,546 +2720,188 @@ To view this task's output:
     }
   }
 
-  private processEvent(managed: ManagedSession, event: AgentEvent): void {
+  /**
+   * Process an ACP SessionUpdate event and map it to IPC events for the renderer.
+   * This replaces the old processEvent() which handled CraftAgent AgentEvent types.
+   *
+   * ACP SessionUpdate types → IPC SessionEvent mapping:
+   * - text → text_delta (streaming) + text_complete (on next update or stream end)
+   * - thinking → text_delta (prefixed, optional)
+   * - toolCall → tool_start / tool_result (based on toolCall.status)
+   * - plan → (rendered inline as text)
+   * - permissionRequest → permission_request
+   * - configUpdate → (update local state)
+   */
+  private processACPUpdate(managed: ManagedSession, update: SessionUpdate): void {
     const sessionId = managed.id
     const workspaceId = managed.workspace.id
 
-    switch (event.type) {
-      case 'text_delta':
-        managed.streamingText += event.text
-        // Queue delta for batched sending (performance: reduces IPC from 50+/sec to ~20/sec)
-        this.queueDelta(sessionId, workspaceId, event.text, event.turnId)
-        break
-
-      case 'text_complete': {
-        // Flush any pending deltas before sending complete (ensures renderer has all content)
-        this.flushDelta(sessionId, workspaceId)
-
-        // SDK's parent_tool_use_id identifies the subagent context for this text
-        // (undefined = main agent / top-level, Task ID = inside subagent)
-        // Only intermediate text (text before a tool_use) gets a parent assignment
-        const textParentToolUseId = event.isIntermediate ? event.parentToolUseId : undefined
-
-        const assistantMessage: Message = {
-          id: generateMessageId(),
-          role: 'assistant',
-          content: event.text,
-          timestamp: Date.now(),
-          isIntermediate: event.isIntermediate,
-          turnId: event.turnId,
-          parentToolUseId: textParentToolUseId,
-        }
-        managed.messages.push(assistantMessage)
-        managed.streamingText = ''
-
-        // Update lastMessageRole and lastFinalMessageId for badge/unread display (only for final messages)
-        if (!event.isIntermediate) {
-          managed.lastMessageRole = 'assistant'
-          managed.lastFinalMessageId = assistantMessage.id
-        }
-
-        this.sendEvent({ type: 'text_complete', sessionId, text: event.text, isIntermediate: event.isIntermediate, turnId: event.turnId, parentToolUseId: textParentToolUseId }, workspaceId)
-
-        // Persist session after complete message to prevent data loss on quit
-        this.persistSession(managed)
+    switch (update.type) {
+      case 'text': {
+        // Stream text delta to renderer
+        managed.streamingText += update.text
+        this.queueDelta(sessionId, workspaceId, update.text)
         break
       }
 
-      case 'tool_start': {
-        // Format tool input paths to relative for better readability
-        const formattedToolInput = formatToolInputPaths(event.input)
+      case 'thinking': {
+        // Render thinking as text delta (optional - can be distinguished in UI later)
+        this.queueDelta(sessionId, workspaceId, update.text)
+        break
+      }
 
-        // Resolve tool display metadata (icon, displayName) for skills/sources
-        // Only resolve when we have input (second event for SDK dual-event pattern)
-        const workspaceRootPath = managed.workspace.rootPath
-        let toolDisplayMeta: ToolDisplayMeta | undefined
-        if (formattedToolInput && Object.keys(formattedToolInput).length > 0) {
-          const allSources = loadAllSources(workspaceRootPath)
-          toolDisplayMeta = resolveToolDisplayMeta(event.toolName, formattedToolInput, workspaceRootPath, allSources)
-        }
+      case 'toolCall': {
+        const tc = update.toolCall
+        const isComplete = tc.status === 'completed' || tc.status === 'failed' || tc.status === 'cancelled'
 
-        // Check if a message with this toolUseId already exists FIRST
-        // SDK sends two events per tool: first from stream_event (empty input),
-        // second from assistant message (complete input)
-        const existingStartMsg = managed.messages.find(m => m.toolUseId === event.toolUseId)
-        const isDuplicateEvent = !!existingStartMsg
-
-        // Use parentToolUseId directly from the event — CraftAgent resolves this
-        // from SDK's parent_tool_use_id (authoritative, handles parallel Tasks correctly).
-        // No stack or map needed; the event carries the correct parent from the start.
-        const parentToolUseId = event.parentToolUseId
-
-        // Track if we need to send an event to the renderer
-        // Send on: first occurrence OR when we have new input data to update
-        let shouldSendEvent = !isDuplicateEvent
-
-        if (existingStartMsg) {
-          // Update existing message with complete input (second event has full input)
-          if (formattedToolInput && Object.keys(formattedToolInput).length > 0) {
-            const hadInputBefore = existingStartMsg.toolInput && Object.keys(existingStartMsg.toolInput).length > 0
-            existingStartMsg.toolInput = formattedToolInput
-            // Send update event if we're adding input that wasn't there before
-            if (!hadInputBefore) {
-              shouldSendEvent = true
+        if (isComplete) {
+          // Tool completed - emit tool_result
+          const existingToolMsg = managed.messages.find(m => m.toolUseId === tc.id)
+          if (existingToolMsg) {
+            existingToolMsg.content = tc.textContent || ''
+            existingToolMsg.toolResult = tc.textContent || ''
+            existingToolMsg.toolStatus = 'completed'
+            existingToolMsg.isError = tc.status === 'failed'
+          } else {
+            // No prior tool_start - create tool message from result
+            const toolMessage: Message = {
+              id: generateMessageId(),
+              role: 'tool',
+              content: tc.textContent || '',
+              timestamp: Date.now(),
+              toolName: tc.title,
+              toolUseId: tc.id,
+              toolResult: tc.textContent || '',
+              toolStatus: 'completed',
+              isError: tc.status === 'failed',
             }
+            managed.messages.push(toolMessage)
           }
-          // Also set parent if not already set
-          if (parentToolUseId && !existingStartMsg.parentToolUseId) {
-            existingStartMsg.parentToolUseId = parentToolUseId
-          }
-          // Set toolDisplayMeta if not already set (has base64 icon for viewer)
-          if (toolDisplayMeta && !existingStartMsg.toolDisplayMeta) {
-            existingStartMsg.toolDisplayMeta = toolDisplayMeta
-          }
-          // Update toolIntent if not already set (second event has intent from complete input)
-          if (event.intent && !existingStartMsg.toolIntent) {
-            existingStartMsg.toolIntent = event.intent
-          }
-          // Update toolDisplayName if not already set
-          if (event.displayName && !existingStartMsg.toolDisplayName) {
-            existingStartMsg.toolDisplayName = event.displayName
-          }
-        } else {
-          // Add tool message immediately (will be updated on tool_result)
-          // This ensures tool calls are persisted even if they don't complete
-          const toolStartMessage: Message = {
-            id: generateMessageId(),
-            role: 'tool',
-            content: `Running ${event.toolName}...`,
-            timestamp: Date.now(),
-            toolName: event.toolName,
-            toolUseId: event.toolUseId,
-            toolInput: formattedToolInput,
-            toolStatus: 'executing',
-            toolIntent: event.intent,
-            toolDisplayName: event.displayName,
-            toolDisplayMeta,  // Includes base64 icon for viewer compatibility
-            turnId: event.turnId,
-            parentToolUseId,
-          }
-          managed.messages.push(toolStartMessage)
-        }
 
-        // Send event to renderer on first occurrence OR when input data is updated
-        if (shouldSendEvent) {
-          this.sendEvent({
-            type: 'tool_start',
-            sessionId,
-            toolName: event.toolName,
-            toolUseId: event.toolUseId,
-            toolInput: formattedToolInput ?? {},
-            toolIntent: event.intent,
-            toolDisplayName: event.displayName,
-            toolDisplayMeta,  // Includes base64 icon for viewer compatibility
-            turnId: event.turnId,
-            parentToolUseId,
-          }, workspaceId)
-        }
-        break
-      }
-
-      case 'tool_result': {
-        // toolName comes directly from CraftAgent (resolved via ToolIndex)
-        const toolName = event.toolName || 'unknown'
-
-        // Format absolute paths to relative paths for better readability
-        const formattedResult = event.result ? formatPathsToRelative(event.result) : ''
-
-        // Update existing tool message (created on tool_start) instead of creating new one
-        const existingToolMsg = managed.messages.find(m => m.toolUseId === event.toolUseId)
-        // Track if already completed to avoid sending duplicate events
-        const wasAlreadyComplete = existingToolMsg?.toolStatus === 'completed'
-
-        sessionLog.info(`RESULT MATCH: toolUseId=${event.toolUseId}, found=${!!existingToolMsg}, toolName=${existingToolMsg?.toolName || toolName}, wasComplete=${wasAlreadyComplete}`)
-
-        // parentToolUseId comes from CraftAgent (SDK-authoritative) or existing message
-        const parentToolUseId = existingToolMsg?.parentToolUseId || event.parentToolUseId
-
-        if (existingToolMsg) {
-          existingToolMsg.content = formattedResult
-          existingToolMsg.toolResult = formattedResult
-          existingToolMsg.toolStatus = 'completed'
-          existingToolMsg.isError = event.isError
-          // If message doesn't have parent set, use event's parentToolUseId
-          if (!existingToolMsg.parentToolUseId && event.parentToolUseId) {
-            existingToolMsg.parentToolUseId = event.parentToolUseId
-          }
-        } else {
-          // No matching tool_start found — create message from result.
-          // This is normal for background subagent child tools where tool_result arrives
-          // without a prior tool_start. If tool_start arrives later, findToolMessage will
-          // locate this message by toolUseId and update it with input/intent/displayMeta.
-          sessionLog.info(`RESULT WITHOUT START: toolUseId=${event.toolUseId}, toolName=${toolName} (creating message from result)`)
-          const fallbackWorkspaceRootPath = managed.workspace.rootPath
-          const fallbackSources = loadAllSources(fallbackWorkspaceRootPath)
-          const fallbackToolDisplayMeta = resolveToolDisplayMeta(toolName, undefined, fallbackWorkspaceRootPath, fallbackSources)
-
-          const toolMessage: Message = {
-            id: generateMessageId(),
-            role: 'tool',
-            content: formattedResult,
-            timestamp: Date.now(),
-            toolName: toolName,
-            toolUseId: event.toolUseId,
-            toolResult: formattedResult,
-            toolStatus: 'completed',
-            toolDisplayMeta: fallbackToolDisplayMeta,
-            parentToolUseId,
-            isError: event.isError,
-          }
-          managed.messages.push(toolMessage)
-        }
-
-        // Send event to renderer if: (a) first completion, or (b) result content changed
-        // (e.g., safety net auto-completed with empty result, then real result arrived later)
-        const resultChanged = wasAlreadyComplete && formattedResult && existingToolMsg?.toolResult !== formattedResult
-        if (!wasAlreadyComplete || resultChanged) {
           this.sendEvent({
             type: 'tool_result',
             sessionId,
-            toolUseId: event.toolUseId,
-            toolName: toolName,
-            result: formattedResult,
-            turnId: event.turnId,
-            parentToolUseId,
-            isError: event.isError,
+            toolUseId: tc.id,
+            toolName: tc.title,
+            result: tc.textContent || '',
+            isError: tc.status === 'failed',
           }, workspaceId)
-        }
 
-        // Safety net: when a parent Task completes, mark all its still-pending child tools as completed.
-        // This handles the case where child tool_result events never arrive (e.g., subagent internal tools
-        // whose results aren't surfaced through the parent stream).
-        const PARENT_TOOLS_FOR_CLEANUP = ['Task', 'TaskOutput']
-        if (PARENT_TOOLS_FOR_CLEANUP.includes(toolName)) {
-          const pendingChildren = managed.messages.filter(
-            m => m.parentToolUseId === event.toolUseId
-              && m.toolStatus !== 'completed'
-              && m.toolStatus !== 'error'
-          )
-          for (const child of pendingChildren) {
-            child.toolStatus = 'completed'
-            child.toolResult = child.toolResult || ''
-            sessionLog.info(`CHILD AUTO-COMPLETED: toolUseId=${child.toolUseId}, toolName=${child.toolName} (parent ${toolName} completed)`)
-            this.sendEvent({
-              type: 'tool_result',
-              sessionId,
-              toolUseId: child.toolUseId!,
-              toolName: child.toolName || 'unknown',
-              result: child.toolResult || '',
-              turnId: child.turnId,
-              parentToolUseId: event.toolUseId,
-            }, workspaceId)
-          }
-        }
-
-        // Persist session after tool completes to prevent data loss on quit
-        this.persistSession(managed)
-        break
-      }
-
-      case 'status':
-        this.sendEvent({
-          type: 'status',
-          sessionId,
-          message: event.message,
-          statusType: event.message.includes('Compacting') ? 'compacting' : undefined
-        }, workspaceId)
-        break
-
-      case 'info': {
-        const isCompactionComplete = event.message.startsWith('Compacted')
-
-        // Persist compaction messages so they survive reload
-        // Other info messages are transient (just sent to renderer)
-        if (isCompactionComplete) {
-          const compactionMessage: Message = {
-            id: generateMessageId(),
-            role: 'info',
-            content: event.message,
-            timestamp: Date.now(),
-            statusType: 'compaction_complete',
-          }
-          managed.messages.push(compactionMessage)
-
-          // Mark compaction complete in the session state.
-          // This is done here (backend) rather than in the renderer so it's
-          // not affected by CMD+R during compaction. The frontend reload
-          // recovery will see awaitingCompaction=false and trigger execution.
-          void markStoredCompactionComplete(managed.workspace.rootPath, sessionId)
-          sessionLog.info(`Session ${sessionId}: compaction complete, marked pending plan ready`)
-
-          // Emit usage_update so the context count badge refreshes immediately
-          // after compaction, without waiting for the next message
-          if (managed.tokenUsage) {
-            this.sendEvent({
-              type: 'usage_update',
-              sessionId,
-              tokenUsage: {
-                inputTokens: managed.tokenUsage.inputTokens,
-                contextWindow: managed.tokenUsage.contextWindow,
-              },
-            }, workspaceId)
-          }
-        }
-
-        this.sendEvent({
-          type: 'info',
-          sessionId,
-          message: event.message,
-          statusType: isCompactionComplete ? 'compaction_complete' : undefined
-        }, workspaceId)
-        break
-      }
-
-      case 'error':
-        // Skip abort errors - these are expected when force-aborting via Query.close()
-        if (event.message.includes('aborted') || event.message.includes('AbortError')) {
-          sessionLog.info('Skipping abort error event (expected during interrupt)')
-          break
-        }
-        // AgentEvent uses `message` not `error`
-        const errorMessage: Message = {
-          id: generateMessageId(),
-          role: 'error',
-          content: event.message,
-          timestamp: Date.now()
-        }
-        managed.messages.push(errorMessage)
-        this.sendEvent({ type: 'error', sessionId, error: event.message }, workspaceId)
-        break
-
-      case 'typed_error':
-        // Skip abort errors - these are expected when force-aborting via Query.close()
-        const typedErrorMsg = event.error.message || event.error.title || ''
-        if (typedErrorMsg.includes('aborted') || typedErrorMsg.includes('AbortError')) {
-          sessionLog.info('Skipping typed abort error event (expected during interrupt)')
-          break
-        }
-        // Typed errors have structured information - send both formats for compatibility
-        sessionLog.info('typed_error:', JSON.stringify(event.error, null, 2))
-
-        // Check for auth errors that can be retried by refreshing the token
-        // The SDK subprocess caches the token at startup, so if it expires mid-session,
-        // we get invalid_api_key errors. We can fix this by:
-        // 1. Refreshing the token (reinitializeAuth)
-        // 2. Destroying the agent (so it recreates with fresh token)
-        // 3. Retrying the message
-        const isAuthError = event.error.code === 'invalid_api_key' ||
-          event.error.code === 'expired_oauth_token'
-
-        if (isAuthError && !managed.authRetryAttempted && managed.lastSentMessage) {
-          sessionLog.info(`Auth error detected, attempting token refresh and retry for session ${sessionId}`)
-          managed.authRetryAttempted = true
-          managed.authRetryInProgress = true
-
-          // Trigger async retry (don't block the event processing)
-          // We use setImmediate to let the current event loop finish
-          setImmediate(async () => {
-            try {
-              // 1. Refresh auth (this will refresh the OAuth token if expired)
-              sessionLog.info(`[auth-retry] Refreshing auth for session ${sessionId}`)
-              await this.reinitializeAuth()
-
-              // 2. Destroy the agent so it gets recreated with fresh token
-              // The SDK subprocess has the old token cached in its env, so we must restart it
-              sessionLog.info(`[auth-retry] Destroying agent for session ${sessionId}`)
-              managed.agent = null
-
-              // 3. Retry the message
-              // Get the stored message/attachments before they're cleared
-              const retryMessage = managed.lastSentMessage
-              const retryAttachments = managed.lastSentAttachments
-              const retryStoredAttachments = managed.lastSentStoredAttachments
-              const retryOptions = managed.lastSentOptions
-
-              if (retryMessage) {
-                sessionLog.info(`[auth-retry] Retrying message for session ${sessionId}`)
-                // Clear processing state so sendMessage can start fresh
-                managed.isProcessing = false
-                // Note: Don't clear lastSentMessage yet - sendMessage will set new ones
-
-                // Remove the user message that was added for this failed attempt
-                // so we don't get duplicate messages when retrying
-                // Find and remove the last user message (the one we're retrying)
-                const lastUserMsgIndex = managed.messages.findLastIndex(m => m.role === 'user')
-                if (lastUserMsgIndex !== -1) {
-                  managed.messages.splice(lastUserMsgIndex, 1)
-                }
-
-                // Clear authRetryInProgress before calling sendMessage
-                // This allows the new request to be processed normally
-                managed.authRetryInProgress = false
-
-                await this.sendMessage(
-                  sessionId,
-                  retryMessage,
-                  retryAttachments,
-                  retryStoredAttachments,
-                  retryOptions,
-                  undefined,  // existingMessageId
-                  true        // _isAuthRetry - prevents infinite retry loop
-                )
-                sessionLog.info(`[auth-retry] Retry completed for session ${sessionId}`)
-              } else {
-                managed.authRetryInProgress = false
-              }
-            } catch (retryError) {
-              managed.authRetryInProgress = false
-              sessionLog.error(`[auth-retry] Failed to retry after auth refresh for session ${sessionId}:`, retryError)
-              // Report auth retry failures to Sentry — indicates credential/SDK issues
-              Sentry.captureException(retryError, {
-                tags: { errorSource: 'auth-retry', sessionId },
-              })
-              // Show the original error to the user since retry failed
-              const failedMessage: Message = {
-                id: generateMessageId(),
-                role: 'error',
-                content: 'Authentication failed. Please check your credentials.',
-                timestamp: Date.now(),
-                errorCode: event.error.code,
-              }
-              managed.messages.push(failedMessage)
-              this.sendEvent({
-                type: 'typed_error',
-                sessionId,
-                error: event.error
-              }, workspaceId)
-              this.onProcessingStopped(sessionId, 'error')
+          this.persistSession(managed)
+        } else {
+          // Tool starting or in progress - emit tool_start
+          const existingMsg = managed.messages.find(m => m.toolUseId === tc.id)
+          if (!existingMsg) {
+            const toolStartMessage: Message = {
+              id: generateMessageId(),
+              role: 'tool',
+              content: `Running ${tc.title}...`,
+              timestamp: Date.now(),
+              toolName: tc.title,
+              toolUseId: tc.id,
+              toolInput: tc.rawInput as Record<string, unknown> | undefined,
+              toolStatus: 'executing',
             }
-          })
+            managed.messages.push(toolStartMessage)
 
-          // Don't add error message or send to renderer - we're handling it via retry
-          break
+            this.sendEvent({
+              type: 'tool_start',
+              sessionId,
+              toolName: tc.title,
+              toolUseId: tc.id,
+              toolInput: (tc.rawInput as Record<string, unknown>) ?? {},
+            }, workspaceId)
+          }
         }
+        break
+      }
 
-        // Build rich error message with all diagnostic fields for persistence and UI display
-        const typedErrorMessage: Message = {
+      case 'plan': {
+        // Render plan entries as a text message
+        const planText = update.entries.map(e => `- [${e.status}] ${e.content}`).join('\n')
+
+        // Flush any pending text first
+        this.flushDelta(sessionId, workspaceId)
+
+        const planMessage: Message = {
           id: generateMessageId(),
-          role: 'error',
-          // Combine title and message for content display (handles undefined gracefully)
-          content: [event.error.title, event.error.message].filter(Boolean).join(': ') || 'An error occurred',
+          role: 'assistant',
+          content: planText,
           timestamp: Date.now(),
-          // Rich error fields for diagnostics and retry functionality
-          errorCode: event.error.code,
-          errorTitle: event.error.title,
-          errorDetails: event.error.details,
-          errorOriginal: event.error.originalError,
-          errorCanRetry: event.error.canRetry,
         }
-        managed.messages.push(typedErrorMessage)
-        // Send typed_error event with full structure for renderer to handle
+        managed.messages.push(planMessage)
+        managed.streamingText = ''
+
         this.sendEvent({
-          type: 'typed_error',
+          type: 'text_complete',
           sessionId,
-          error: {
-            code: event.error.code,
-            title: event.error.title,
-            message: event.error.message,
-            actions: event.error.actions,
-            canRetry: event.error.canRetry,
-            details: event.error.details,
-            originalError: event.error.originalError,
+          text: planText,
+        }, workspaceId)
+        break
+      }
+
+      case 'permissionRequest': {
+        // Store the permission request for responding later
+        managed.pendingACPPermissionRequest = update.request
+
+        // Map to existing permission_request IPC event
+        const toolCallId = update.request.toolCallId
+        const optionNames = update.request.options.map(o => o.name).join(', ')
+        this.sendEvent({
+          type: 'permission_request',
+          sessionId,
+          request: {
+            sessionId,
+            requestId: toolCallId ?? 'acp-perm',
+            toolName: toolCallId ?? 'unknown',
+            command: toolCallId ? `Tool: ${toolCallId}` : 'Permission required',
+            description: `Options: ${optionNames}`,
           }
         }, workspaceId)
         break
+      }
 
-      case 'task_backgrounded':
-      case 'task_progress':
-        // Forward background task events directly to renderer
-        this.sendEvent({
-          ...event,
-          sessionId,
-        }, workspaceId)
-        break
-
-      case 'shell_backgrounded':
-        // Store the command for later process killing
-        if (event.command && managed) {
-          managed.backgroundShellCommands.set(event.shellId, event.command)
-          sessionLog.info(`Stored command for shell ${event.shellId}: ${event.command.slice(0, 50)}...`)
+      case 'configUpdate': {
+        // Update local config state from server
+        if (managed.acpSession) {
+          managed.acpSession.configOptions = update.configOptions
         }
-        // Forward to renderer
-        this.sendEvent({
-          ...event,
-          sessionId,
-        }, workspaceId)
+        sessionLog.info(`Config update for session ${sessionId}: ${update.configOptions.length} options`)
         break
+      }
+    }
+  }
 
-      case 'source_activated':
-        // A source was auto-activated mid-turn, forward to renderer for auto-retry
-        sessionLog.info(`Source "${event.sourceSlug}" activated, notifying renderer for auto-retry`)
-        this.sendEvent({
-          type: 'source_activated',
-          sessionId,
-          sourceSlug: event.sourceSlug,
-          originalMessage: event.originalMessage,
-        }, workspaceId)
-        break
+  /**
+   * Finalize streaming text into a complete assistant message.
+   * Called when the ACP prompt stream ends.
+   */
+  private finalizeStreamingText(managed: ManagedSession): void {
+    if (managed.streamingText.length > 0) {
+      const sessionId = managed.id
+      const workspaceId = managed.workspace.id
 
-      case 'complete':
-        // Complete event from CraftAgent - accumulate usage from this turn
-        // Actual 'complete' sent to renderer comes from the finally block in sendMessage
-        if (event.usage) {
-          // Initialize tokenUsage if not set
-          if (!managed.tokenUsage) {
-            managed.tokenUsage = {
-              inputTokens: 0,
-              outputTokens: 0,
-              totalTokens: 0,
-              contextTokens: 0,
-              costUsd: 0,
-            }
-          }
-          // inputTokens = current context size (full conversation sent this turn), NOT accumulated
-          // Each API call sends the full conversation history, so we use the latest value
-          managed.tokenUsage.inputTokens = event.usage.inputTokens
-          // outputTokens and costUsd are accumulated across all turns (total session usage)
-          managed.tokenUsage.outputTokens += event.usage.outputTokens
-          managed.tokenUsage.totalTokens = managed.tokenUsage.inputTokens + managed.tokenUsage.outputTokens
-          managed.tokenUsage.costUsd += event.usage.costUsd ?? 0
-          // Cache tokens reflect current state, not accumulated
-          managed.tokenUsage.cacheReadTokens = event.usage.cacheReadTokens ?? 0
-          managed.tokenUsage.cacheCreationTokens = event.usage.cacheCreationTokens ?? 0
-          // Update context window (use latest value - may change if model switches)
-          if (event.usage.contextWindow) {
-            managed.tokenUsage.contextWindow = event.usage.contextWindow
-          }
-        }
-        break
+      // Flush any pending deltas
+      this.flushDelta(sessionId, workspaceId)
 
-      case 'usage_update':
-        // Real-time usage update for context display during processing
-        // Update managed session's tokenUsage with latest context size
-        if (event.usage) {
-          if (!managed.tokenUsage) {
-            managed.tokenUsage = {
-              inputTokens: 0,
-              outputTokens: 0,
-              totalTokens: 0,
-              contextTokens: 0,
-              costUsd: 0,
-            }
-          }
-          // Update only inputTokens (current context size) - other fields accumulate on complete
-          managed.tokenUsage.inputTokens = event.usage.inputTokens
-          if (event.usage.contextWindow) {
-            managed.tokenUsage.contextWindow = event.usage.contextWindow
-          }
+      const assistantMessage: Message = {
+        id: generateMessageId(),
+        role: 'assistant',
+        content: managed.streamingText,
+        timestamp: Date.now(),
+      }
+      managed.messages.push(assistantMessage)
+      managed.lastMessageRole = 'assistant'
+      managed.lastFinalMessageId = assistantMessage.id
+      managed.streamingText = ''
 
-          // Send to renderer for immediate UI update
-          this.sendEvent({
-            type: 'usage_update',
-            sessionId: managed.id,
-            tokenUsage: {
-              inputTokens: event.usage.inputTokens,
-              contextWindow: event.usage.contextWindow,
-            },
-          }, workspaceId)
-        }
-        break
+      this.sendEvent({
+        type: 'text_complete',
+        sessionId,
+        text: assistantMessage.content,
+      }, workspaceId)
 
-      // Note: working_directory_changed is user-initiated only (via updateWorkingDirectory),
-      // the agent no longer has a change_working_directory tool
+      this.persistSession(managed)
     }
   }
 
@@ -3778,9 +3011,11 @@ To view this task's output:
     // Clear pending credential resolvers (they won't be resolved, but prevents memory leak)
     this.pendingCredentialResolvers.clear()
 
-    // Clean up session-scoped tool callbacks for all sessions
-    for (const sessionId of this.sessions.keys()) {
-      unregisterSessionScopedToolCallbacks(sessionId)
+    // Stop the ACP client subprocess
+    if (this.acpClient) {
+      this.acpClient.stop()
+      this.acpClient = null
+      sessionLog.info('Stopped ACP client')
     }
 
     sessionLog.info('Cleanup complete')

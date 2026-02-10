@@ -3,8 +3,7 @@
  *
  * Renders content based on the unified NavigationState:
  * - Chats navigator: ChatPage for selected session, or empty state
- * - Sources navigator: SourceInfoPage for selected source, or empty state
- * - Settings navigator: Settings, Preferences, or Shortcuts page
+ * - Settings navigator: AppSettingsPage only (MVP simplified)
  *
  * The NavigationState is the single source of truth for what to display.
  *
@@ -20,12 +19,10 @@ import { StoplightProvider } from '@/context/StoplightContext'
 import {
   useNavigationState,
   isChatsNavigation,
-  isSourcesNavigation,
   isSettingsNavigation,
-  isSkillsNavigation,
 } from '@/contexts/NavigationContext'
-import { AppSettingsPage, AppearanceSettingsPage, InputSettingsPage, WorkspaceSettingsPage, PermissionsSettingsPage, LabelsSettingsPage, PreferencesPage, ShortcutsPage, SourceInfoPage, ChatPage } from '@/pages'
-import SkillInfoPage from '@/pages/SkillInfoPage'
+// MVP: Simplified page imports - only core pages
+import { AppSettingsPage, ShortcutsPage, ChatPage } from '@/pages'
 
 export interface MainContentPanelProps {
   /** Whether the app is in focused mode (single chat, no sidebar) */
@@ -48,49 +45,13 @@ export function MainContentPanel({
     </StoplightProvider>
   )
 
-  // Settings navigator - always has content (subpage determines which page)
+  // Settings navigator - MVP: only app settings and shortcuts
   if (isSettingsNavigation(navState)) {
     switch (navState.subpage) {
-      case 'appearance':
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <AppearanceSettingsPage />
-          </Panel>
-        )
-      case 'input':
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <InputSettingsPage />
-          </Panel>
-        )
-      case 'workspace':
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <WorkspaceSettingsPage />
-          </Panel>
-        )
-      case 'permissions':
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <PermissionsSettingsPage />
-          </Panel>
-        )
-      case 'labels':
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <LabelsSettingsPage />
-          </Panel>
-        )
       case 'shortcuts':
         return wrapWithStoplight(
           <Panel variant="grow" className={className}>
             <ShortcutsPage />
-          </Panel>
-        )
-      case 'preferences':
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <PreferencesPage />
           </Panel>
         )
       case 'app':
@@ -101,50 +62,6 @@ export function MainContentPanel({
           </Panel>
         )
     }
-  }
-
-  // Sources navigator - show source info or empty state
-  if (isSourcesNavigation(navState)) {
-    if (navState.details) {
-      return wrapWithStoplight(
-        <Panel variant="grow" className={className}>
-          <SourceInfoPage
-            sourceSlug={navState.details.sourceSlug}
-            workspaceId={activeWorkspaceId || ''}
-          />
-        </Panel>
-      )
-    }
-    // No source selected - empty state
-    return wrapWithStoplight(
-      <Panel variant="grow" className={className}>
-        <div className="flex items-center justify-center h-full text-muted-foreground">
-          <p className="text-sm">No sources configured</p>
-        </div>
-      </Panel>
-    )
-  }
-
-  // Skills navigator - show skill info or empty state
-  if (isSkillsNavigation(navState)) {
-    if (navState.details?.type === 'skill') {
-      return wrapWithStoplight(
-        <Panel variant="grow" className={className}>
-          <SkillInfoPage
-            skillSlug={navState.details.skillSlug}
-            workspaceId={activeWorkspaceId || ''}
-          />
-        </Panel>
-      )
-    }
-    // No skill selected - empty state
-    return wrapWithStoplight(
-      <Panel variant="grow" className={className}>
-        <div className="flex items-center justify-center h-full text-muted-foreground">
-          <p className="text-sm">No skills configured</p>
-        </div>
-      </Panel>
-    )
   }
 
   // Chats navigator - show chat or empty state
@@ -170,7 +87,7 @@ export function MainContentPanel({
     )
   }
 
-  // Fallback (should not happen with proper NavigationState)
+  // Fallback - redirect to chats
   return wrapWithStoplight(
     <Panel variant="grow" className={className}>
       <div className="flex items-center justify-center h-full text-muted-foreground">

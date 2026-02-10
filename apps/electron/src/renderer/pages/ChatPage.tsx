@@ -21,6 +21,7 @@ import { rendererPerf } from '@/lib/perf'
 import { routes } from '@/lib/navigate'
 import { ensureSessionMessagesLoadedAtom, loadedSessionsAtom, sessionMetaMapAtom } from '@/atoms/sessions'
 import { getSessionTitle } from '@/utils/session'
+import type { AgentProfile } from '../../shared/types'
 
 export interface ChatPageProps {
   sessionId: string
@@ -168,8 +169,16 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
     }
   }, [sessionId, activeWorkspaceId])
 
+  // Session profile change handler - persists per-session profile
+  const handleProfileChange = React.useCallback((profile: AgentProfile) => {
+    window.electronAPI.sessionCommand(sessionId, { type: 'setProfile', profile })
+  }, [sessionId])
+
   // Effective model for this session (session-specific or global fallback)
   const effectiveModel = session?.model || currentModel
+
+  // Effective profile for this session
+  const effectiveProfile = session?.profile || 'chat'
 
   // Working directory for this session
   const workingDirectory = session?.workingDirectory
@@ -455,6 +464,8 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
                 onOpenUrl={handleOpenUrl}
                 currentModel={effectiveModel}
                 onModelChange={handleModelChange}
+                profile={effectiveProfile}
+                onProfileChange={handleProfileChange}
                 textareaRef={textareaRef}
                 pendingPermission={undefined}
                 onRespondToPermission={onRespondToPermission}
@@ -526,6 +537,8 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
             onOpenUrl={handleOpenUrl}
             currentModel={effectiveModel}
             onModelChange={handleModelChange}
+            profile={effectiveProfile}
+            onProfileChange={handleProfileChange}
             textareaRef={textareaRef}
             pendingPermission={pendingPermission}
             onRespondToPermission={onRespondToPermission}

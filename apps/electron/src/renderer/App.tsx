@@ -149,7 +149,8 @@ export default function App() {
   }, [])
 
   // App state: loading -> check auth -> onboarding or ready
-  const [appState, setAppState] = useState<AppState>('loading')
+  // MVP: Initialize to 'ready' to bypass onboarding (internal OpenCode use)
+  const [appState, setAppState] = useState<AppState>('ready')
   const [setupNeeds, setSetupNeeds] = useState<SetupNeeds | null>(null)
 
   // Per-session Jotai atom setters for isolated updates
@@ -433,7 +434,7 @@ export default function App() {
     // Handoff events signal end of streaming - need to sync back to React state
     // Also includes todo_state_changed so status updates immediately reflect in sidebar
     // async_operation included so shimmer effect on session titles updates in real-time
-    const handoffEventTypes = new Set(['complete', 'error', 'interrupted', 'typed_error', 'todo_state_changed', 'session_flagged', 'session_unflagged', 'name_changed', 'labels_changed', 'title_generated', 'async_operation'])
+    const handoffEventTypes = new Set(['complete', 'error', 'interrupted', 'typed_error', 'todo_state_changed', 'session_flagged', 'session_unflagged', 'name_changed', 'labels_changed', 'title_generated', 'async_operation', 'session_profile_changed'])
 
     // Helper to handle side effects (same logic for both paths)
     const handleEffects = (effects: Effect[], sessionId: string, eventType: string) => {
@@ -1305,9 +1306,11 @@ export default function App() {
     )
   }
 
-  // Onboarding state
+  // Onboarding state - COMMENTED OUT FOR MVP
   // ModalProvider + WindowCloseHandler ensures X button works on Windows
   // (without this, the close IPC message has no listener and window stays open)
+  // MVP: Onboarding is bypassed - app goes directly to 'ready' state
+  /*
   if (appState === 'onboarding') {
     return (
       <ModalProvider>
@@ -1331,6 +1334,7 @@ export default function App() {
       </ModalProvider>
     )
   }
+  */
 
   // Show splash until exit animation completes
   const showSplash = !splashHidden

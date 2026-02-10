@@ -29,6 +29,12 @@ export type TodoState = string;
 export type BuiltInStatusId = 'todo' | 'in-progress' | 'needs-review' | 'done' | 'cancelled';
 
 /**
+ * Agent profile for the session
+ * Determines the behavior and capabilities of the agent
+ */
+export type AgentProfile = 'chat' | 'agent' | 'testcase';
+
+/**
  * Session token usage tracking
  */
 export interface SessionTokenUsage {
@@ -108,6 +114,8 @@ export interface SessionConfig {
   };
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean;
+  /** Agent profile for this session (chat, agent, testcase) - defaults to 'chat' */
+  profile?: AgentProfile;
 }
 
 /**
@@ -179,6 +187,8 @@ export interface SessionHeader {
   };
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean;
+  /** Agent profile for this session (chat, agent, testcase) - defaults to 'chat' */
+  profile?: AgentProfile;
   // Pre-computed fields for fast list loading
   /** Number of messages in session */
   messageCount: number;
@@ -245,4 +255,6 @@ export interface SessionMetadata {
   tokenUsage?: SessionTokenUsage;
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean;
+  /** Agent profile for this session (chat, agent, testcase) - defaults to 'chat' */
+  profile?: AgentProfile;
 }

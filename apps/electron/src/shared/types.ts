@@ -42,6 +42,10 @@ import type { AuthState, SetupNeeds } from '@craft-agent/shared/auth/types';
 import type { AuthType } from '@craft-agent/shared/config/types';
 export type { AuthState, SetupNeeds, AuthType };
 
+// Import agent profile type
+import type { AgentProfile } from '@craft-agent/shared/sessions/types';
+export type { AgentProfile };
+
 // Import source types for session source selection
 import type { LoadedSource, FolderSourceConfig, SourceConnectionStatus } from '@craft-agent/shared/sources/types';
 export type { LoadedSource, FolderSourceConfig, SourceConnectionStatus };
@@ -367,6 +371,8 @@ export interface Session {
   }
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean
+  /** Agent profile for this session (chat, agent, testcase) - defaults to 'chat' */
+  profile?: AgentProfile
 }
 
 /**
@@ -435,6 +441,7 @@ export type SessionEvent =
   | { type: 'session_unflagged'; sessionId: string }
   | { type: 'name_changed'; sessionId: string; name?: string }
   | { type: 'session_model_changed'; sessionId: string; model: string | null }
+  | { type: 'session_profile_changed'; sessionId: string; profile: AgentProfile }
   | { type: 'todo_state_changed'; sessionId: string; todoState: TodoState }
   | { type: 'session_deleted'; sessionId: string }
   | { type: 'session_shared'; sessionId: string; sharedUrl: string }
@@ -490,6 +497,7 @@ export type SessionCommand =
   | { type: 'setPendingPlanExecution'; planPath: string }
   | { type: 'markCompactionComplete' }
   | { type: 'clearPendingPlanExecution' }
+  | { type: 'setProfile'; profile: AgentProfile }
 
 /**
  * Parameters for opening a new chat session

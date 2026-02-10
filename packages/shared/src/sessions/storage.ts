@@ -415,6 +415,7 @@ function headerToMetadata(header: SessionHeader, workspaceRootPath: string): Ses
       hasUnread: header.hasUnread,
       // Hidden flag for mini-agent sessions (not shown in session list)
       hidden: header.hidden,
+      profile: header.profile,
     };
   } catch {
     return null;

@@ -2,19 +2,14 @@
  * Pages Index
  *
  * Export all page components for use in MainContentPanel.
+ * MVP: Simplified to only core pages.
  */
 
+// Core pages
 export { default as ChatPage } from './ChatPage'
-export { default as SourceInfoPage } from './SourceInfoPage'
-// Settings pages
+
+// Settings pages - MVP: Only AppSettingsPage and ShortcutsPage
 export {
-  SettingsNavigator,
   AppSettingsPage,
-  AppearanceSettingsPage,
-  InputSettingsPage,
-  WorkspaceSettingsPage,
-  PermissionsSettingsPage,
-  LabelsSettingsPage,
   ShortcutsPage,
-  PreferencesPage,
 } from './settings'
