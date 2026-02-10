@@ -12,7 +12,7 @@
  */
 
 import { getCredentialManager } from '../credentials/index.ts';
-import { loadStoredConfig, getActiveWorkspace, type AuthType, type Workspace } from '../config/storage.ts';
+import { getActiveWorkspace, type Workspace } from '../config/storage.ts';
 import { refreshClaudeToken, isTokenExpired } from './claude-token.ts';
 import { debug } from '../utils/debug.ts';
 
@@ -35,9 +35,9 @@ export interface TokenResult {
 export interface AuthState {
   /** Claude API billing configuration */
   billing: {
-    /** Configured billing type, or null if not yet configured */
-    type: AuthType | null;
-    /** True if we have the required credentials for the configured billing type */
+    /** Always null — OpenCode handles auth, PMI-Agent does not manage billing type */
+    type: null;
+    /** True if we have the required credentials (always true — OpenCode manages auth) */
     hasCredentials: boolean;
     /** Anthropic API key (if using api_key auth type) */
     apiKey: string | null;
@@ -223,25 +223,18 @@ export async function getValidClaudeOAuthToken(): Promise<TokenResult> {
  * Get complete authentication state from all sources (config file + credential store)
  */
 export async function getAuthState(): Promise<AuthState> {
-  const config = loadStoredConfig();
   const manager = getCredentialManager();
 
   const apiKey = await manager.getApiKey();
   const tokenResult = await getValidClaudeOAuthToken();
   const activeWorkspace = getActiveWorkspace();
 
-  // Determine if billing credentials are satisfied based on auth type
-  let hasCredentials = false;
-  if (config?.authType === 'api_key') {
-    // Keyless providers (Ollama) are valid when a custom base URL is configured
-    hasCredentials = !!apiKey || !!config?.anthropicBaseUrl;
-  } else if (config?.authType === 'oauth_token') {
-    hasCredentials = !!tokenResult.accessToken;
-  }
+  // OpenCode handles all authentication — PMI-Agent always considers credentials satisfied
+  const hasCredentials = true;
 
   return {
     billing: {
-      type: config?.authType ?? null,
+      type: null,
       hasCredentials,
       apiKey,
       claudeOAuthToken: tokenResult.accessToken,
@@ -258,16 +251,11 @@ export async function getAuthState(): Promise<AuthState> {
  * Derive what setup steps are needed based on current auth state
  */
 export function getSetupNeeds(state: AuthState): SetupNeeds {
-  // Need billing config if no billing type is set
-  const needsBillingConfig = state.billing.type === null;
-
-  // Need credentials if billing type is set but credentials are missing
-  const needsCredentials = state.billing.type !== null && !state.billing.hasCredentials;
-
+  // OpenCode handles all auth — billing config and credentials are always satisfied
   return {
-    needsBillingConfig,
-    needsCredentials,
-    isFullyConfigured: !needsBillingConfig && !needsCredentials,
+    needsBillingConfig: false,
+    needsCredentials: false,
+    isFullyConfigured: true,
     needsMigration: state.billing.migrationRequired,
   };
 }

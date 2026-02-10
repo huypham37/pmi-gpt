@@ -62,13 +62,18 @@ const WorkspaceSchema = z.object({
 const AuthTypeSchema = z.enum(['api_key', 'oauth_token']);
 
 export const StoredConfigSchema = z.object({
-  authType: AuthTypeSchema.optional(),
   workspaces: z.array(WorkspaceSchema).min(0),
   activeWorkspaceId: z.string().nullable(),
   activeSessionId: z.string().nullable(),
   model: z.string().optional(),
-  // Note: tokenDisplay, showCost, cumulativeUsage, defaultPermissionMode removed
-  // Permission mode and cyclable modes are now per-workspace in workspace config.json
+  mode: z.string().optional(),
+  // UI settings
+  notificationsEnabled: z.boolean().optional(),
+  colorTheme: z.string().optional(),
+  dismissedUpdateVersion: z.string().optional(),
+  autoCapitalisation: z.boolean().optional(),
+  sendMessageKey: z.enum(['enter', 'cmd-enter']).optional(),
+  spellCheck: z.boolean().optional(),
 });
 
 // --- preferences.json ---

@@ -11,7 +11,6 @@ import { getDefaultOptions } from '../agent/options.ts';
 import { CraftMcpClient } from './client.js';
 import { debug } from '../utils/debug.ts';
 import { DEFAULT_MODEL } from '../config/models.ts';
-import { resolveModelId } from '../config/storage.ts';
 import { parseError, type AgentError } from '../agent/errors.ts';
 import { getLastApiError } from '../network-interceptor.ts';
 
@@ -181,7 +180,7 @@ export async function validateMcpConnection(
       options: {
         ...getDefaultOptions(),
         mcpServers,
-        model: resolveModelId(config.model || DEFAULT_MODEL),
+        model: config.model || DEFAULT_MODEL,
         abortController,
       },
     });

@@ -6,7 +6,7 @@ import { getSystemPrompt, getDateTimeContext, getWorkingDirectoryContext } from 
 // Plan types are used by UI components; not needed in craft-agent.ts since Safe Mode is user-controlled
 import { parseError, type AgentError } from './errors.ts';
 import { runErrorDiagnostics } from './diagnostics.ts';
-import { loadStoredConfig, loadConfigDefaults, getAnthropicBaseUrl, resolveModelId, type Workspace } from '../config/storage.ts';
+import { loadConfigDefaults, type Workspace } from '../config/storage.ts';
 import { isLocalMcpEnabled } from '../workspaces/storage.ts';
 import { loadPlanFromPath, type SessionConfig as Session } from '../sessions/storage.ts';
 import { DEFAULT_MODEL, isClaudeModel } from '../config/models.ts';
@@ -852,10 +852,10 @@ export class CraftAgent {
       // Configure SDK options
       // Resolve model: use tier name when using custom API (OpenRouter), else specific version
       const modelConfig = this.config.model || DEFAULT_MODEL;
-      const model = resolveModelId(modelConfig);
+      const model = modelConfig;
 
       // Log provider context for diagnostics (custom base URL = third-party provider)
-      const activeBaseUrl = getAnthropicBaseUrl();
+      const activeBaseUrl = process.env.ANTHROPIC_BASE_URL?.trim();
       if (activeBaseUrl) {
         debug(`[chat] Custom provider: baseUrl=${activeBaseUrl}, model=${model}, hasApiKey=${!!process.env.ANTHROPIC_API_KEY}`);
       }
@@ -1899,9 +1899,7 @@ export class CraftAgent {
           debug('[SESSION_DEBUG] >>> TAKING PATH: Run diagnostics (not session expired)');
 
           // Run diagnostics to identify specific cause (2s timeout)
-          const storedConfig = loadStoredConfig();
           const diagnostics = await runErrorDiagnostics({
-            authType: storedConfig?.authType,
             workspaceId: this.config.workspace?.id,
             rawError: stderrContext || rawErrorMsg,
           });

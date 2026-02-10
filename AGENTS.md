@@ -1,58 +1,27 @@
-# AGENTS.md
+## Description:
 
-## Commands
-- **Test:** `bun test` (single: `bun test path/to/file.test.ts`)
-- **Typecheck:** `bun run typecheck:all`
-- **Lint:** `bun run lint`
-- **Dev:** `bun run electron:dev`
-- **Build:** `bun run electron:build`
+You are working on an application names pmi-agent, the main goal of this application is to provide a UI for AI agent, it is backed by Opencode as backend agent framework. The app (client) communicates with opencode via Agent-Client Protocol (ACP).
 
-## Architecture
-Bun monorepo with workspaces. Electron desktop app with OpenCode agent backend.
-- `apps/electron/` - Desktop app (main/preload/renderer with React+Vite+shadcn)
-- `packages/core/` - Shared TypeScript types (`@craft-agent/core`)
-- `packages/shared/` - Business logic: agent, config, MCP, sessions (`@craft-agent/shared`)
-- `packages/shared/src/agent/providers/` - Agent provider abstraction (OpenCode SDK)
-- Config stored at `~/.craft-agent/`
+## IMPORTANT: 
+This describes the important decision that you should an should not do in the period of the session:
+SHOULD NOT:
+* Do not create unnessary file (report,etc) if user did not ask for.
+## Memory
+The application memory is structured into two different level. 
+1. Issue-based memory: You can find the memory at .opencode/.memory/issue/*.md
+2. Project memory: the project memory you can find it here.
 
-## Agent Provider
-- Internal tool using OpenCode SDK (`@opencode-ai/sdk`)
-- No authentication required - auto-creates default workspace on first launch
-- App starts OpenCode server automatically
+### Memory Schema:
+Current Step: Brief desc on the current step
+(Optional) Plan
+Next immediate: Brief desc on the next immediate step
+(Optional) Current issues: Brief Description on current issues
+Tried approach n | status | why it failed (Optional)
+If current issues exists: 
 
-### OpenCode Integration
-OpenCode SDK is integrated via a provider abstraction layer at `packages/shared/src/agent/providers/`:
-- **types.ts** - `AgentProvider` interface defining `runTurn()`, `abort()`, `dispose()`
-- **opencode-provider.ts** - Wraps OpenCode SDK's `session.prompt()` + `event.subscribe()` pattern
-- **factory.ts** - `createProvider('opencode', deps)` factory function
+Note:
+* Update the memory as frequent as possible.
 
-Provider emits unified `AgentEvent` types (text_delta, tool_start, tool_result, complete).
-
-### Default Workspace
-On first launch, the app auto-creates `~/.craft-agent/workspaces/default/` to hide workspace setup from users.
-- `ensureDefaultWorkspace()` in `packages/shared/src/config/storage.ts` handles this
-- No onboarding/authentication flow - goes straight to main app
-
-## Code Style
-- TypeScript with strict mode, ESNext target, React JSX
-- Use subpath exports: `import { X } from '@craft-agent/shared/agent'`
-- Tailwind CSS v4 + shadcn/ui components
-- Zod for validation
-- Session is primary isolation boundary (not workspace)
-- Use `generateMessageId()` for message IDs
-
-## MVP features:
-- Principle: 
-1. Agent-mode  
-1.1. Testcase mode -> Talk with test case, generate test case.
-1.1.2: main agent generate test case with steps and guidance, another agent to validate and modify if necessary. 
-1.2 General Agent mode: Not at the moment to restrict
-
-Chat-mode:
-1.1. Normal chatmode with file attachment and stuffs.
-
-## TODO: OpenCode Integration
-The `CraftAgent` class in `packages/shared/src/agent/craft-agent.ts` still uses Claude SDK directly.
-To complete OpenCode integration, need to:
-1. Refactor `SessionManager.getOrCreateAgent()` to use `OpenCodeProvider` instead of `CraftAgent`
-2. Or refactor `CraftAgent` to use the provider abstraction layer
+## References:
+2. Find more about Opencode at: https://opencode.ai/docs
+1. Find more about Agent Client Protocol at: https://agentclientprotocol.com/get-started/introduction

@@ -249,12 +249,9 @@ export default function App() {
 
   const DRAFT_SAVE_DEBOUNCE_MS = 500
 
-  // Re-fetch custom model from API setup config (called after API connection changes).
-  // Defined early so it can be passed to useOnboarding's onConfigSaved.
-  const refreshCustomModel = useCallback(async () => {
-    const billing = await window.electronAPI.getApiSetup()
-    setCustomModel(billing.customModel || null)
-  }, [])
+  // No-op: customModel is no longer managed via getApiSetup (OpenCode handles model config).
+  // Kept as a no-op to satisfy AppShellContext interface; will be fully removed in a follow-up.
+  const refreshCustomModel = useCallback(async () => {}, [])
 
   // Handle onboarding completion
   const handleOnboardingComplete = useCallback(async () => {
@@ -394,10 +391,6 @@ export default function App() {
       if (storedModel) {
         setCurrentModel(storedModel)
       }
-    })
-    // Load custom model override from API connection settings
-    window.electronAPI.getApiSetup().then((billing) => {
-      setCustomModel(billing.customModel || null)
     })
     // Load persisted input drafts into ref (no re-render needed)
     window.electronAPI.getAllDrafts().then((drafts) => {

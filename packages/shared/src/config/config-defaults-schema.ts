@@ -3,7 +3,6 @@
  * This file contains the default values for all configuration options.
  */
 
-import type { AuthType } from '@craft-agent/core/types';
 import type { PermissionMode } from '../agent/mode-manager.ts';
 import type { ThinkingLevel } from '../agent/thinking-levels.ts';
 
@@ -11,7 +10,6 @@ export interface ConfigDefaults {
   version: string;
   description: string;
   defaults: {
-    authType: AuthType;
     notificationsEnabled: boolean;
     colorTheme: string;
     autoCapitalisation: boolean;
@@ -34,9 +32,8 @@ export interface ConfigDefaults {
  */
 export const BUNDLED_CONFIG_DEFAULTS: ConfigDefaults = {
   version: '1.0',
-  description: 'Default configuration values for Craft Agent',
+  description: 'Default configuration values for PMI-Agent',
   defaults: {
-    authType: 'api_key',
     notificationsEnabled: true,
     colorTheme: 'default',
     autoCapitalisation: true,
@@ -45,7 +42,7 @@ export const BUNDLED_CONFIG_DEFAULTS: ConfigDefaults = {
   },
   workspaceDefaults: {
     thinkingLevel: 'think',
-    permissionMode: 'safe', // NEW: was 'ask' before
+    permissionMode: 'safe',
     cyclablePermissionModes: ['safe', 'ask', 'allow-all'],
     localMcpServers: {
       enabled: true,

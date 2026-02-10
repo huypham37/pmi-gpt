@@ -13,8 +13,6 @@ import {
   getWorkspaces,
   getWorkspaceByNameOrId,
   loadConfigDefaults,
-  getAnthropicBaseUrl,
-  resolveModelId,
   type Workspace,
 } from '@craft-agent/shared/config'
 import { loadWorkspaceConfig } from '@craft-agent/shared/workspaces'
@@ -721,7 +719,7 @@ export class SessionManager {
     try {
       const authState = await getAuthState()
       const { billing } = authState
-      const customBaseUrl = getAnthropicBaseUrl()
+      const customBaseUrl = null
 
       sessionLog.info('Reinitializing auth with billing type:', billing.type, customBaseUrl ? `(custom base URL: ${customBaseUrl})` : '')
 
@@ -1455,7 +1453,7 @@ export class SessionManager {
       sessionLog.info(`Created ACP session for ${managed.id}: acpSessionId=${managed.acpSession.id}`)
 
       // Set model if session has a specific model override
-      const resolvedModel = resolveModelId(managed.model || config?.model || DEFAULT_MODEL)
+      const resolvedModel = managed.model || config?.model || DEFAULT_MODEL
       try {
         await managed.acpSession.setModel(resolvedModel)
       } catch (e) {
@@ -1984,7 +1982,7 @@ export class SessionManager {
       if (managed.acpSession) {
         const wsConfig = loadWorkspaceConfig(managed.workspace.rootPath)
         const effectiveModel = model ?? wsConfig?.defaults?.model ?? loadStoredConfig()?.model ?? DEFAULT_MODEL
-        const resolvedModel = resolveModelId(effectiveModel)
+        const resolvedModel = effectiveModel
         managed.acpSession.setModel(resolvedModel).catch(e => {
           sessionLog.warn(`Failed to set model ${resolvedModel}:`, e)
         })

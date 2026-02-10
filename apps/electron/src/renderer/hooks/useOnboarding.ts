@@ -213,7 +213,7 @@ export function useOnboarding({
   }, [])
 
   // Submit credential (API key + optional endpoint config)
-  // Tests the connection first via /v1/messages before saving to catch issues early
+  // OpenCode handles connection validation, so we skip client-side testing and save directly
   const handleSubmitCredential = useCallback(async (data: ApiKeySubmitData) => {
     setState(s => ({ ...s, credentialStatus: 'validating', errorMessage: undefined }))
 
@@ -225,23 +225,6 @@ export function useOnboarding({
           ...s,
           credentialStatus: 'error',
           errorMessage: 'Please enter a valid API key',
-        }))
-        return
-      }
-
-      // Validate connection before saving — tests auth, endpoint reachability,
-      // model existence, and tool support in one call
-      const testResult = await window.electronAPI.testApiConnection(
-        data.apiKey,
-        data.baseUrl,
-        data.customModel,
-      )
-
-      if (!testResult.success) {
-        setState(s => ({
-          ...s,
-          credentialStatus: 'error',
-          errorMessage: testResult.error || 'Connection test failed',
         }))
         return
       }

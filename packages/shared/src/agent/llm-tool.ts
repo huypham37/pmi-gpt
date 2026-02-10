@@ -24,7 +24,7 @@ type ToolResult = {
 };
 import { readFile } from 'fs/promises';
 import { existsSync, statSync } from 'fs';
-import { getAnthropicApiKey, getAnthropicBaseUrl, getClaudeOAuthToken } from '../config/storage.ts';
+import { getAnthropicApiKey, getClaudeOAuthToken } from '../config/storage.ts';
 
 // ============================================================================
 // CONSTANTS
@@ -577,7 +577,7 @@ For large files (>2000 lines), use {path, startLine, endLine} to select a portio
       // BUILD CLIENT
       // ========================================
 
-      const baseUrl = getAnthropicBaseUrl();
+      const baseUrl = null;
 
       // Build client with API key (OAuth-only case already handled above with clear error)
       const client = new Anthropic({

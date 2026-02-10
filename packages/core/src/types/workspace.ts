@@ -33,15 +33,14 @@ export interface OAuthCredentials {
   tokenType: string;
 }
 
-/** Agent provider type */
+/** Agent provider type (always 'opencode' for PMI-Agent) */
 export type AgentProviderType = 'opencode';
 
 // Config stored in JSON file (credentials stored in encrypted file, not here)
 export interface StoredConfig {
-  authType?: AuthType;
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
-  activeSessionId: string | null;  // Currently active session (primary scope)
+  activeSessionId: string | null;
   model?: string;
-  provider?: AgentProviderType;  // Agent provider to use (default: 'opencode')
+  mode?: string;
 }

@@ -622,10 +622,12 @@ export const IPC_CHANNELS = {
   ONBOARDING_HAS_CLAUDE_OAUTH_STATE: 'onboarding:hasClaudeOAuthState',
   ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE: 'onboarding:clearClaudeOAuthState',
 
-  // Settings - API Setup
-  SETTINGS_GET_API_SETUP: 'settings:getApiSetup',
-  SETTINGS_UPDATE_API_SETUP: 'settings:updateApiSetup',
-  SETTINGS_TEST_API_CONNECTION: 'settings:testApiConnection',
+  // Settings - API Setup (REMOVED - OpenCode handles auth)
+  // SETTINGS_GET_API_SETUP, SETTINGS_UPDATE_API_SETUP, SETTINGS_TEST_API_CONNECTION removed
+
+  // Settings - Mode (ACP code profile)
+  SETTINGS_GET_MODE: 'settings:getMode',
+  SETTINGS_SET_MODE: 'settings:setMode',
 
   // Settings - Model
   SETTINGS_GET_MODEL: 'settings:getModel',
@@ -895,10 +897,11 @@ export interface ElectronAPI {
   hasClaudeOAuthState(): Promise<boolean>
   clearClaudeOAuthState(): Promise<{ success: boolean }>
 
-  // Settings - API Setup
-  getApiSetup(): Promise<ApiSetupInfo>
-  updateApiSetup(authType: AuthType, credential?: string, anthropicBaseUrl?: string | null, customModel?: string | null): Promise<void>
-  testApiConnection(apiKey: string, baseUrl?: string, modelName?: string): Promise<{ success: boolean; error?: string; modelCount?: number }>
+  // Settings - API Setup (REMOVED - OpenCode handles auth)
+
+  // Settings - Mode (ACP code profile)
+  getMode(): Promise<string | null>
+  setMode(mode: string | null): Promise<void>
 
   // Settings - Model (global default)
   getModel(): Promise<string | null>
@@ -1065,17 +1068,6 @@ export interface ClaudeOAuthResult {
   success: boolean
   token?: string
   error?: string
-}
-
-/**
- * Current API setup info for settings
- */
-export interface ApiSetupInfo {
-  authType: AuthType
-  hasCredential: boolean
-  apiKey?: string  // The stored API key (only returned for api_key auth type)
-  anthropicBaseUrl?: string  // Custom Anthropic API base URL (for third-party compatible APIs)
-  customModel?: string  // Custom model ID override (for third-party APIs)
 }
 
 /**

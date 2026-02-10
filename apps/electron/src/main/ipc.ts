@@ -9,9 +9,9 @@ import { SessionManager } from './sessions'
 import { ipcLog, windowLog, searchLog } from './logger'
 import { WindowManager } from './window-manager'
 import { registerOnboardingHandlers } from './onboarding'
-import { IPC_CHANNELS, type FileAttachment, type StoredAttachment, type AuthType, type ApiSetupInfo, type SendMessageOptions } from '../shared/types'
+import { IPC_CHANNELS, type FileAttachment, type StoredAttachment, type SendMessageOptions } from '../shared/types'
 import { readFileAttachment, perf, validateImageForClaudeAPI, IMAGE_LIMITS } from '@craft-agent/shared/utils'
-import { getAuthType, setAuthType, getPreferencesPath, getCustomModel, setCustomModel, getModel, setModel, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, addWorkspace, setActiveWorkspace, getAnthropicBaseUrl, setAnthropicBaseUrl, loadStoredConfig, saveConfig, type Workspace, SUMMARIZATION_MODEL } from '@craft-agent/shared/config'
+import { getPreferencesPath, getModel, setModel, getMode, setMode, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, addWorkspace, setActiveWorkspace, loadStoredConfig, saveConfig, type Workspace } from '@craft-agent/shared/config'
 import { getSessionAttachmentsPath, validateSessionId } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, getSourcesBySlugs, type LoadedSource } from '@craft-agent/shared/sources'
 import { isValidThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
@@ -1172,230 +1172,18 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
   })
 
   // ============================================================
-  // Settings - API Setup
+  // Settings - Mode (ACP code profile)
   // ============================================================
 
-  // Get current API setup and credential status
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_API_SETUP, async (): Promise<ApiSetupInfo> => {
-    const authType = getAuthType()
-    const manager = getCredentialManager()
-
-    let hasCredential = false
-    let apiKey: string | undefined
-    let anthropicBaseUrl: string | undefined
-    let customModel: string | undefined
-
-    if (authType === 'api_key') {
-      apiKey = await manager.getApiKey() ?? undefined
-      anthropicBaseUrl = getAnthropicBaseUrl() ?? undefined
-      customModel = getCustomModel() ?? undefined
-      // Keyless providers (Ollama) are valid when a custom base URL is configured
-      hasCredential = !!apiKey || !!anthropicBaseUrl
-    } else if (authType === 'oauth_token') {
-      hasCredential = !!(await manager.getClaudeOAuth())
-    }
-
-    return {
-      authType,
-      hasCredential,
-      apiKey,
-      anthropicBaseUrl,
-      customModel,
-    }
+  // Get current mode
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_MODE, async (): Promise<string | null> => {
+    return getMode()
   })
 
-  // Update API setup and credential
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_UPDATE_API_SETUP, async (_event, authType: AuthType, credential?: string, anthropicBaseUrl?: string | null, customModel?: string | null) => {
-    const manager = getCredentialManager()
-
-    // Clear old credentials when switching auth types
-    const oldAuthType = getAuthType()
-    if (oldAuthType !== authType) {
-      if (oldAuthType === 'api_key') {
-        await manager.delete({ type: 'anthropic_api_key' })
-      } else if (oldAuthType === 'oauth_token') {
-        await manager.delete({ type: 'claude_oauth' })
-      }
-    }
-
-    // Set new auth type
-    setAuthType(authType)
-
-    // Update Anthropic base URL (null to clear, undefined to keep unchanged)
-    if (anthropicBaseUrl !== undefined) {
-      try {
-        setAnthropicBaseUrl(anthropicBaseUrl)
-        if (anthropicBaseUrl) {
-          ipcLog.info('Anthropic base URL updated (HTTPS enforced)')
-        } else {
-          ipcLog.info('Anthropic base URL cleared')
-        }
-      } catch (error) {
-        ipcLog.error('Failed to set Anthropic base URL:', error)
-        throw error
-      }
-    }
-
-    // Update custom model (null to clear, undefined to keep unchanged)
-    if (customModel !== undefined) {
-      setCustomModel(customModel)
-      if (customModel) {
-        ipcLog.info('Custom model set:', customModel)
-      } else {
-        ipcLog.info('Custom model cleared')
-      }
-    }
-
-    // Store or clear credential
-    if (credential) {
-      if (authType === 'api_key') {
-        await manager.setApiKey(credential)
-      } else if (authType === 'oauth_token') {
-        // Save the access token (refresh token and expiry are managed by the OAuth flow)
-        await manager.setClaudeOAuth(credential)
-        ipcLog.info('Saved Claude OAuth access token')
-      }
-    } else if (credential === '') {
-      // Empty string means user explicitly cleared the credential
-      if (authType === 'api_key') {
-        await manager.delete({ type: 'anthropic_api_key' })
-        ipcLog.info('API key cleared')
-      } else if (authType === 'oauth_token') {
-        await manager.delete({ type: 'claude_oauth' })
-        ipcLog.info('Claude OAuth cleared')
-      }
-    }
-
-    ipcLog.info(`API setup updated to: ${authType}`)
-
-    // Reinitialize SessionManager auth to pick up new credentials
-    try {
-      await sessionManager.reinitializeAuth()
-      ipcLog.info('Reinitialized auth after billing update')
-    } catch (authError) {
-      ipcLog.error('Failed to reinitialize auth:', authError)
-      // Don't fail the whole operation if auth reinit fails
-    }
-  })
-
-  // Test API connection (validates API key, base URL, and optionally custom model)
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_TEST_API_CONNECTION, async (_event, apiKey: string, baseUrl?: string, modelName?: string): Promise<{ success: boolean; error?: string; modelCount?: number }> => {
-    const trimmedKey = apiKey?.trim()
-    const trimmedUrl = baseUrl?.trim()
-
-    // Require API key unless a custom base URL is provided (e.g. Ollama needs no key)
-    if (!trimmedKey && !trimmedUrl) {
-      return { success: false, error: 'API key is required' }
-    }
-
-    try {
-      // Unified test: send a minimal POST to /v1/messages with a tool definition.
-      // This validates connection, auth, model existence, and tool support in one call.
-      // Works identically for Anthropic, OpenRouter, Vercel AI Gateway, and Ollama (v0.14+).
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-
-      // Auth strategy:
-      // - Custom base URL: pass key as authToken (SDK sends Authorization: Bearer,
-      //   which OpenRouter, Vercel AI Gateway, and Ollama all accept).
-      //   Explicitly null the other auth param to prevent SDK from reading env vars.
-      // - Anthropic direct: pass as apiKey (SDK sends x-api-key header)
-      const client = new Anthropic({
-        ...(trimmedUrl ? { baseURL: trimmedUrl } : {}),
-        ...(trimmedUrl
-          ? { authToken: trimmedKey || 'ollama', apiKey: null }  // Bearer for custom URLs; 'ollama' dummy for no-key local APIs
-          : { apiKey: trimmedKey, authToken: null }              // x-api-key for Anthropic direct
-        ),
-      })
-
-      // Determine test model: user-specified model takes priority, otherwise use
-      // the default Haiku model for known providers (validates full pipeline).
-      // Custom endpoints MUST specify a model — there's no sensible default.
-      const userModel = modelName?.trim()
-      let testModel: string
-      if (userModel) {
-        testModel = userModel
-      } else if (!trimmedUrl || trimmedUrl.includes('openrouter.ai') || trimmedUrl.includes('ai-gateway.vercel.sh')) {
-        // Anthropic, OpenRouter, and Vercel are all Anthropic-compatible — same model IDs
-        testModel = SUMMARIZATION_MODEL
-      } else {
-        // Custom endpoint with no model specified — can't test without knowing the model
-        return { success: false, error: 'Please specify a model for custom endpoints' }
-      }
-
-      // OpenAI models via providers like OpenRouter require max_tokens >= 16
-      // See: https://github.com/langgenius/dify-official-plugins/issues/1694
-      await client.messages.create({
-        model: testModel,
-        max_tokens: 16,
-        messages: [{ role: 'user', content: 'hi' }],
-        // Include a tool to validate tool/function calling support
-        tools: [{
-          name: 'test_tool',
-          description: 'Test tool for validation',
-          input_schema: { type: 'object' as const, properties: {} }
-        }]
-      })
-
-      // 200 response — everything works (auth, endpoint, model, tool support)
-      return { success: true }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      const lowerMsg = msg.toLowerCase()
-      ipcLog.info(`[testApiConnection] Error: ${msg.slice(0, 500)}`)
-
-      // Connection errors — server unreachable
-      if (lowerMsg.includes('econnrefused') || lowerMsg.includes('enotfound') || lowerMsg.includes('fetch failed')) {
-        return { success: false, error: 'Cannot connect to API server. Check the URL and ensure the server is running.' }
-      }
-
-      // 404 on endpoint — /v1/messages doesn't exist (wrong URL or Ollama < v0.14)
-      if (lowerMsg.includes('404') && !lowerMsg.includes('model')) {
-        return { success: false, error: 'Endpoint not found. Ensure the server supports the Anthropic Messages API (/v1/messages). For Ollama, version 0.14+ is required.' }
-      }
-
-      // Auth errors
-      if (lowerMsg.includes('401') || lowerMsg.includes('unauthorized') || lowerMsg.includes('authentication')) {
-        return { success: false, error: 'Invalid API key' }
-      }
-
-      // OpenRouter data policy errors (check before tool support since both may contain "model")
-      if (lowerMsg.includes('data policy') || lowerMsg.includes('privacy')) {
-        return { success: false, error: 'Data policy restriction. Configure your privacy settings at openrouter.ai/settings/privacy' }
-      }
-
-      // Tool support errors (check before model-not-found since tool errors often contain "model")
-      const isToolSupportError =
-        lowerMsg.includes('no endpoints found that support tool use') ||
-        lowerMsg.includes('does not support tool') ||
-        lowerMsg.includes('tool_use is not supported') ||
-        lowerMsg.includes('function calling not available') ||
-        lowerMsg.includes('tools are not supported') ||
-        lowerMsg.includes('doesn\'t support tool') ||
-        lowerMsg.includes('tool use is not supported') ||
-        (lowerMsg.includes('tool') && lowerMsg.includes('not') && lowerMsg.includes('support'))
-      if (isToolSupportError) {
-        const displayModel = modelName?.trim() || SUMMARIZATION_MODEL
-        return { success: false, error: `Model "${displayModel}" does not support tool/function calling. Craft Agent requires a model with tool support (e.g. Claude, GPT-4, Gemini).` }
-      }
-
-      // Model not found — always a failure. Since onboarding is the only place
-      // to configure the model, we must validate it actually exists.
-      const isModelNotFound =
-        lowerMsg.includes('model not found') ||
-        lowerMsg.includes('is not a valid model') ||
-        lowerMsg.includes('invalid model') ||
-        (lowerMsg.includes('404') && lowerMsg.includes('model'))
-      if (isModelNotFound) {
-        if (modelName?.trim()) {
-          return { success: false, error: `Model "${modelName}" not found. Check the model name and try again.` }
-        }
-        // Default model (Haiku) not found on a known provider — likely a billing/permissions issue
-        return { success: false, error: 'Could not access the default model. Check your API key permissions and billing.' }
-      }
-
-      // Fallback: return the raw error message
-      return { success: false, error: msg.slice(0, 300) }
-    }
+  // Set mode (null to clear / use server default)
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_SET_MODE, async (_event, mode: string | null) => {
+    setMode(mode)
+    ipcLog.info(`Mode updated to: ${mode ?? '(default)'}`)
   })
 
   // ============================================================

@@ -14,7 +14,6 @@ import { expandPath, toPortablePath, getBundledAssetsDir } from '../utils/paths.
 import { CONFIG_DIR } from './paths.ts';
 import type { StoredAttachment, StoredMessage } from '@craft-agent/core/types';
 import type { Plan } from '../agent/plan-types.ts';
-import type { PermissionMode } from '../agent/mode-manager.ts';
 import { BUNDLED_CONFIG_DEFAULTS, type ConfigDefaults } from './config-defaults-schema.ts';
 
 // Re-export CONFIG_DIR for convenience (centralized in paths.ts)
@@ -30,28 +29,26 @@ export type {
 } from '@craft-agent/core/types';
 
 // Import for local use
-import type { Workspace, AuthType, AgentProviderType } from '@craft-agent/core/types';
+import type { Workspace } from '@craft-agent/core/types';
 
 // Config stored in JSON file (credentials stored in encrypted file, not here)
 export interface StoredConfig {
-  authType?: AuthType;
-  anthropicBaseUrl?: string;  // Custom Anthropic API base URL (for third-party compatible APIs)
-  customModel?: string;  // Custom model ID override (for third-party APIs like OpenRouter, Ollama)
+  // Core
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
-  activeSessionId: string | null;  // Currently active session (primary scope)
+  activeSessionId: string | null;
   model?: string;
+  mode?: string;
   // Notifications
-  notificationsEnabled?: boolean;  // Desktop notifications for task completion (default: true)
+  notificationsEnabled?: boolean;
   // Appearance
-  colorTheme?: string;  // ID of selected preset theme (e.g., 'dracula', 'nord'). Default: 'default'
+  colorTheme?: string;
   // Auto-update
-  dismissedUpdateVersion?: string;  // Version that user dismissed (skip notifications for this version)
+  dismissedUpdateVersion?: string;
   // Input settings
-  autoCapitalisation?: boolean;  // Auto-capitalize first letter when typing (default: true)
-  sendMessageKey?: 'enter' | 'cmd-enter';  // Key to send messages (default: 'enter')
-  spellCheck?: boolean;  // Enable spell check in input (default: false)
-  provider?: AgentProviderType;  // Agent provider to use (default: 'opencode')
+  autoCapitalisation?: boolean;
+  sendMessageKey?: 'enter' | 'cmd-enter';
+  spellCheck?: boolean;
 }
 
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -173,55 +170,6 @@ export function saveConfig(config: StoredConfig): void {
   writeFileSync(CONFIG_FILE, JSON.stringify(storageConfig, null, 2), 'utf-8');
 }
 
-export async function updateApiKey(newApiKey: string): Promise<boolean> {
-  const config = loadStoredConfig();
-  if (!config) return false;
-
-  // Save API key to credential store
-  const manager = getCredentialManager();
-  await manager.setApiKey(newApiKey);
-
-  // Update auth type in config (but not the key itself)
-  config.authType = 'api_key';
-  saveConfig(config);
-  return true;
-}
-
-export function getAuthType(): AuthType {
-  const config = loadStoredConfig();
-  if (config?.authType !== undefined) {
-    return config.authType;
-  }
-  const defaults = loadConfigDefaults();
-  return defaults.defaults.authType;
-}
-
-export function setAuthType(authType: AuthType): void {
-  const config = loadStoredConfig();
-  if (!config) return;
-  config.authType = authType;
-  saveConfig(config);
-}
-
-export function setAnthropicBaseUrl(baseUrl: string | null): void {
-  const config = loadStoredConfig();
-  if (!config) return;
-
-  if (baseUrl) {
-    const trimmed = baseUrl.trim();
-    // URL validation deferred to Test Connection button
-    config.anthropicBaseUrl = trimmed;
-  } else {
-    delete config.anthropicBaseUrl;
-  }
-  saveConfig(config);
-}
-
-export function getAnthropicBaseUrl(): string | null {
-  const config = loadStoredConfig();
-  return config?.anthropicBaseUrl ?? null;
-}
-
 export function getModel(): string | null {
   const config = loadStoredConfig();
   return config?.model ?? null;
@@ -235,21 +183,25 @@ export function setModel(model: string): void {
 }
 
 /**
- * Get the agent provider type.
- * Defaults to 'opencode' for internal use.
+ * Get the default ACP mode ID (code profile).
+ * Returns null if not set (uses server default).
  */
-export function getProvider(): AgentProviderType {
+export function getMode(): string | null {
   const config = loadStoredConfig();
-  return config?.provider ?? 'opencode';
+  return config?.mode ?? null;
 }
 
 /**
- * Set the agent provider type.
+ * Set the default ACP mode ID (code profile).
  */
-export function setProvider(provider: AgentProviderType): void {
+export function setMode(mode: string | null): void {
   const config = loadStoredConfig();
   if (!config) return;
-  config.provider = provider;
+  if (mode) {
+    config.mode = mode;
+  } else {
+    delete config.mode;
+  }
   saveConfig(config);
 }
 
@@ -592,7 +544,6 @@ export function ensureDefaultWorkspace(): Workspace {
       workspaces: [],
       activeWorkspaceId: null,
       activeSessionId: null,
-      provider: 'opencode',  // Default to OpenCode for internal use
     };
     saveConfig(config);
   }
@@ -619,7 +570,6 @@ export function ensureDefaultWorkspace(): Workspace {
 
   config.workspaces.push(newWorkspace);
   config.activeWorkspaceId = newWorkspace.id;
-  config.provider = 'opencode';  // Ensure OpenCode is the provider
   saveConfig(config);
 
   return newWorkspace;
@@ -1200,48 +1150,6 @@ export function clearDismissedUpdateVersion(): void {
   if (!config) return;
   delete config.dismissedUpdateVersion;
   saveConfig(config);
-}
-
-// ============================================
-// Custom Model (for third-party APIs)
-// ============================================
-
-/**
- * Get custom model ID override for third-party APIs.
- * When set, this single model is used for ALL API calls (main, summarization, etc.)
- */
-export function getCustomModel(): string | null {
-  const config = loadStoredConfig();
-  return config?.customModel?.trim() || null;
-}
-
-/**
- * Set custom model ID for third-party APIs.
- * Pass null to clear and use default Anthropic models.
- */
-export function setCustomModel(model: string | null): void {
-  const config = loadStoredConfig();
-  if (!config) return;
-
-  if (model?.trim()) {
-    config.customModel = model.trim();
-  } else {
-    delete config.customModel;
-  }
-  saveConfig(config);
-}
-
-/**
- * Resolve model ID based on custom model override.
- * When a custom model is configured (for OpenRouter, Ollama, etc.),
- * it overrides ALL model calls (main, summarization, extraction).
- * @param defaultModelId - The default Anthropic model ID
- * @returns The custom model if set, otherwise the default
- */
-export function resolveModelId(defaultModelId: string): string {
-  const customModel = getCustomModel();
-  if (customModel) return customModel;
-  return defaultModelId;
 }
 
 // ============================================

@@ -177,12 +177,11 @@ const api: ElectronAPI = {
   hasClaudeOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_HAS_CLAUDE_OAUTH_STATE),
   clearClaudeOAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_CLEAR_CLAUDE_OAUTH_STATE),
 
-  // Settings - API Setup
-  getApiSetup: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_API_SETUP),
-  updateApiSetup: (authType: AuthType, credential?: string, anthropicBaseUrl?: string | null, customModel?: string | null) =>
-    ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE_API_SETUP, authType, credential, anthropicBaseUrl, customModel),
-  testApiConnection: (apiKey: string, baseUrl?: string, modelName?: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_TEST_API_CONNECTION, apiKey, baseUrl, modelName),
+  // Settings - API Setup (REMOVED - OpenCode handles auth)
+
+  // Settings - Mode (ACP code profile)
+  getMode: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_MODE),
+  setMode: (mode: string | null) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_MODE, mode),
 
   // Settings - Model (global default)
   getModel: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_MODEL),

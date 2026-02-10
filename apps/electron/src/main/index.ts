@@ -282,10 +282,7 @@ app.whenReady().then(async () => {
     try {
       const config = loadStoredConfig()
       const workspaces = getWorkspaces()
-      Sentry.setTag('authType', config?.authType ?? 'unknown')
-      Sentry.setTag('hasCustomEndpoint', String(!!config?.anthropicBaseUrl))
       Sentry.setTag('model', config?.model ?? 'default')
-      Sentry.setTag('customModel', config?.customModel ?? 'none')
       Sentry.setTag('workspaceCount', String(workspaces.length))
     } catch (err) {
       mainLog.warn('Failed to set Sentry context tags:', err)
