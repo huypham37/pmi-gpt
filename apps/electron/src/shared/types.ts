@@ -628,7 +628,6 @@ export const IPC_CHANNELS = {
   // Settings - Mode (ACP code profile)
   SETTINGS_GET_MODE: 'settings:getMode',
   SETTINGS_SET_MODE: 'settings:setMode',
-
   // Settings - Model
   SETTINGS_GET_MODEL: 'settings:getModel',
   SETTINGS_SET_MODEL: 'settings:setModel',
@@ -902,7 +901,6 @@ export interface ElectronAPI {
   // Settings - Mode (ACP code profile)
   getMode(): Promise<string | null>
   setMode(mode: string | null): Promise<void>
-
   // Settings - Model (global default)
   getModel(): Promise<string | null>
   setModel(model: string): Promise<void>

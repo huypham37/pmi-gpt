@@ -92,8 +92,12 @@ function Root() {
   // Load workspace ID for theme context (workspace-specific theme overrides)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
 
+  console.log('[RENDERER-DEBUG] Root component rendering, workspaceId:', workspaceId)
+
   useEffect(() => {
+    console.log('[RENDERER-DEBUG] Root useEffect: calling getWindowWorkspace...')
     window.electronAPI?.getWindowWorkspace?.().then((id) => {
+      console.log('[RENDERER-DEBUG] Root useEffect: getWindowWorkspace returned:', id)
       setWorkspaceId(id)
     })
   }, [])

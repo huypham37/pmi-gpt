@@ -88,6 +88,14 @@ Branch: `feature/mvp-stripping`
 - Auth retry logic in processEvent was removed - may need ACP equivalent later
 - `buildServersFromSources()` top-level function still exists (unused in hot path)
 
+## WSL Bridge for ACPClient (Windows)
+- Updated `packages/acp-client/src/ACPClient.ts` to detect Windows (`os.platform() === "win32"`)
+- On Windows: resolves opencode binary inside WSL via `bash -ic "which opencode"` with fallback to `$HOME/.opencode/bin/opencode`
+- Spawns `wsl.exe <absolute-wsl-opencode-path> acp` instead of native `opencode.exe acp`
+- Converts `workingDirectory` from Windows path to WSL path (`C:\Users\foo` → `/mnt/c/Users/foo`) for `session/new` cwd parameter
+- The `spawn()` cwd stays as the original Windows path (Node.js needs it for process creation)
+- Added helper functions: `winToWslPath()`, `resolveWslOpencode()`
+
 ## Next: Phase 2 - Strip UI
 1. Bypass onboarding in `apps/electron/src/renderer/App.tsx`
 2. Strip sidebar in `apps/electron/src/renderer/components/app-shell/AppShell.tsx`

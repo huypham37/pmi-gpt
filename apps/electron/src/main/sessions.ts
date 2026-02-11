@@ -48,7 +48,7 @@ import { type Session, type Message, type SessionEvent, type FileAttachment, typ
 import { generateSessionTitle, regenerateSessionTitle, formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrl, getEmojiIcon, resetSummarizationClient, resolveToolIcon } from '@craft-agent/shared/utils'
 import { loadWorkspaceSkills, type LoadedSkill } from '@craft-agent/shared/skills'
 import type { ToolDisplayMeta } from '@craft-agent/core/types'
-import { DEFAULT_MODEL, getToolIconsDir } from '@craft-agent/shared/config'
+import { DEFAULT_MODEL, getToolIconsDir, getMode } from '@craft-agent/shared/config'
 import { type ThinkingLevel, DEFAULT_THINKING_LEVEL } from '@craft-agent/shared/agent/thinking-levels'
 import { evaluateAutoLabels } from '@craft-agent/shared/labels/auto'
 import { listLabels } from '@craft-agent/shared/labels/storage'
@@ -502,7 +502,6 @@ export class SessionManager {
    * marked as unread when assistant completes - if user is viewing it, don't mark unread.
    */
   private activeViewingSession: Map<string, string> = new Map()
-
   setWindowManager(wm: WindowManager): void {
     this.windowManager = wm
   }
@@ -762,6 +761,7 @@ export class SessionManager {
   }
 
   async initialize(): Promise<void> {
+    sessionLog.info('[STARTUP-DEBUG] SessionManager.initialize() started')
     const basePath = app.isPackaged ? app.getAppPath() : process.cwd()
 
     // Resolve the OpenCode executable for the ACP subprocess
@@ -778,6 +778,8 @@ export class SessionManager {
       }
     }
 
+    sessionLog.info(`[STARTUP-DEBUG] OpenCode executable resolved to: ${opencodeExecutable}`)
+
     // Create and start the ACP client
     // Default working directory to a temp directory in project root
     const defaultCwd = join(__dirname, '..', '..', 'temp-workspace')
@@ -788,6 +790,7 @@ export class SessionManager {
       sessionLog.info(`Created temp workspace directory: ${defaultCwd}`)
     }
     
+    sessionLog.info(`[STARTUP-DEBUG] Creating ACPClient with cwd: ${defaultCwd}`)
     this.acpClient = new ACPClient({
       executable: opencodeExecutable,
       arguments: ['acp'],
@@ -801,17 +804,24 @@ export class SessionManager {
     })
 
     try {
+      sessionLog.info('[STARTUP-DEBUG] Calling acpClient.start()...')
+      const acpStartTime = Date.now()
       await this.acpClient.start()
+      sessionLog.info(`[STARTUP-DEBUG] acpClient.start() completed in ${Date.now() - acpStartTime}ms`)
       sessionLog.info('ACP client started successfully')
       sessionLog.info('Agent info:', JSON.stringify(this.acpClient.agentInfo))
     } catch (error) {
+      sessionLog.error('[STARTUP-DEBUG] acpClient.start() FAILED:', error)
       sessionLog.error('Failed to start ACP client:', error)
       // Don't throw - allow app to start even if ACP subprocess fails
       // Users will see errors when they try to send messages
     }
 
     // Load existing sessions from disk
+    sessionLog.info('[STARTUP-DEBUG] Loading sessions from disk...')
+    const loadStart = Date.now()
     this.loadSessionsFromDisk()
+    sessionLog.info(`[STARTUP-DEBUG] loadSessionsFromDisk() completed in ${Date.now() - loadStart}ms, sessions count: ${this.sessions.size}`)
   }
 
   // Load all existing sessions from disk into memory (metadata only - messages are lazy-loaded)
@@ -1449,22 +1459,28 @@ export class SessionManager {
       const end = perf.start('acpSession.create', { sessionId: managed.id })
       const config = loadStoredConfig()
       // Create a new ACP session (the server owns tools/prompts/behavior)
+      sessionLog.info(`[ACP-DIAG] Creating new ACP session for ${managed.id}...`)
       managed.acpSession = await this.acpClient.newSession()
-      sessionLog.info(`Created ACP session for ${managed.id}: acpSessionId=${managed.acpSession.id}`)
+      sessionLog.info(`[ACP-DIAG] Created ACP session for ${managed.id}: acpSessionId=${managed.acpSession.id}`)
 
       // Set model if session has a specific model override
       const resolvedModel = managed.model || config?.model || DEFAULT_MODEL
+      sessionLog.info(`[ACP-DIAG] Setting model to: ${resolvedModel}`)
       try {
         await managed.acpSession.setModel(resolvedModel)
+        sessionLog.info(`[ACP-DIAG] Model set successfully: ${resolvedModel}`)
       } catch (e) {
-        sessionLog.warn(`Failed to set model ${resolvedModel}:`, e)
+        sessionLog.warn(`[ACP-DIAG] Failed to set model ${resolvedModel}:`, e)
       }
 
-      // Set mode to 'build' (default agentic mode with tool access)
+      // Set mode from config (falls back to 'build' if not configured)
+      const resolvedMode = getMode() || 'build'
+      sessionLog.info(`[ACP-DIAG] Setting mode to: ${resolvedMode}`)
       try {
-        await managed.acpSession.setMode('build')
+        await managed.acpSession.setMode(resolvedMode)
+        sessionLog.info(`[ACP-DIAG] Mode set successfully: ${resolvedMode}`)
       } catch (e) {
-        sessionLog.warn('Failed to set mode build:', e)
+        sessionLog.warn(`[ACP-DIAG] Failed to set mode ${resolvedMode}:`, e)
       }
 
       end()
@@ -2226,18 +2242,20 @@ export class SessionManager {
     sendSpan.mark('acpSession.ready')
 
     try {
-      sessionLog.info('Starting chat for session:', sessionId)
-      sessionLog.info('Message:', message)
+      sessionLog.info(`[ACP-DIAG] Starting chat for session: ${sessionId}`)
+      sessionLog.info(`[ACP-DIAG] Message: "${message.substring(0, 100)}"`)
+      sessionLog.info(`[ACP-DIAG] ACP session ID: ${acpSession.id}`)
 
       sendSpan.mark('chat.starting')
+      sessionLog.info('[ACP-DIAG] Calling acpSession.prompt()...')
       const updateStream = acpSession.prompt(message)
-      sessionLog.info('Got ACP update stream, starting iteration...')
+      sessionLog.info('[ACP-DIAG] prompt() returned, entering for-await loop...')
 
+      let updateCount = 0
       for await (const update of updateStream) {
-        // Log updates (skip noisy text)
-        if (update.type !== 'text') {
-          sessionLog.info('Got ACP update:', update.type)
-        }
+        updateCount++
+        // Log ALL updates for debugging
+        sessionLog.info(`[ACP-DIAG] Update #${updateCount}: type=${update.type}${update.type === 'text' ? `, text="${(update as any).text?.substring(0, 50)}"` : ''}`)
 
         // Process the ACP update
         this.processACPUpdate(managed, update)
@@ -2253,7 +2271,7 @@ export class SessionManager {
       this.finalizeStreamingText(managed)
 
       // Stream completed - handle completion
-      sessionLog.info('ACP prompt stream completed')
+      sessionLog.info(`[ACP-DIAG] ACP prompt stream completed. Total updates received: ${updateCount}`)
       sendSpan.mark('chat.complete')
       sendSpan.end()
       this.onProcessingStopped(sessionId, 'complete')

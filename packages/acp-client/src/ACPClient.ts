@@ -18,6 +18,46 @@ import {
 } from "./protocol/ACPTypes.js";
 import type { AgentInfo, AgentCapabilities, AIModel, AIMode } from "./protocol/ACPTypes.js";
 import { ACPSession } from "./ACPSession.js";
+import { execFileSync } from "node:child_process";
+import os from "node:os";
+
+function winToWslPath(winPath: string): string {
+  let p = winPath.replace(/\\/g, "/");
+  if (p.length >= 2 && p[1] === ":") {
+    const drive = p[0].toLowerCase();
+    p = `/mnt/${drive}${p.slice(2)}`;
+  }
+  return p;
+}
+
+function resolveWslOpencode(): string {
+  const wslBin = "wsl.exe";
+  try {
+    const result = execFileSync(wslBin, ["bash", "-ic", "which opencode 2>/dev/null"], {
+      encoding: "utf-8",
+      timeout: 10_000,
+    }).trim();
+    if (result && result.includes("/")) {
+      return result;
+    }
+  } catch {
+    // interactive shell failed, try known paths
+  }
+
+  const homeResult = execFileSync(wslBin, ["bash", "-c", "echo $HOME"], {
+    encoding: "utf-8",
+    timeout: 5_000,
+  }).trim();
+  const candidate = `${homeResult}/.opencode/bin/opencode`;
+  try {
+    execFileSync(wslBin, ["test", "-f", candidate], { timeout: 5_000 });
+    return candidate;
+  } catch {
+    throw new Error(
+      `opencode not found inside WSL. Install in WSL: curl -fsSL https://opencode.ai/install | bash`,
+    );
+  }
+}
 
 interface PendingRequest {
   resolve: (value: JSONValue) => void;
@@ -29,6 +69,7 @@ export class ACPClient {
   private readonly clientInfo: ClientInfo;
   private readonly clientCapabilities: ClientCapabilities;
   private readonly workingDirectory: string | undefined;
+  private readonly useWsl: boolean;
 
   agentInfo: AgentInfo | undefined;
   agentCapabilities: AgentCapabilities | undefined;
@@ -46,23 +87,48 @@ export class ACPClient {
     clientInfo: ClientInfo;
     capabilities?: ClientCapabilities;
   }) {
+    const isWindows = os.platform() === "win32";
+    this.useWsl = isWindows;
+
+    let executable: string;
+    let args: string[];
+    let workingDirectory = opts.workingDirectory;
+
+    if (isWindows) {
+      const wslOpencode = resolveWslOpencode();
+      executable = "wsl.exe";
+      args = [wslOpencode, ...(opts.arguments ?? ["acp"])];
+      console.log(`[ACP-DEBUG] Windows detected, routing through WSL: wsl.exe ${wslOpencode} ${(opts.arguments ?? ["acp"]).join(" ")}`);
+    } else {
+      executable = opts.executable;
+      args = opts.arguments ?? ["acp"];
+    }
+
     this.transport = new StdioTransport({
-      executable: opts.executable,
-      args: opts.arguments ?? ["acp"],
+      executable,
+      args,
       environment: opts.environment,
-      workingDirectory: opts.workingDirectory,
+      workingDirectory,
     });
     this.clientInfo = opts.clientInfo;
     this.clientCapabilities = opts.capabilities ?? ClientCapabilitiesPresets.none;
-    this.workingDirectory = opts.workingDirectory;
+    if (isWindows && workingDirectory) {
+      this.workingDirectory = winToWslPath(workingDirectory);
+    } else {
+      this.workingDirectory = workingDirectory;
+    }
   }
 
   async start(): Promise<void> {
+    console.log('[ACP-DEBUG] ACPClient.start() called');
     this.transport.onData = (data: Buffer) => {
       this.handleIncomingData(data);
     };
+    console.log('[ACP-DEBUG] Starting transport...');
     await this.transport.start();
+    console.log('[ACP-DEBUG] Transport started, sending initialize request...');
     await this.initialize();
+    console.log('[ACP-DEBUG] ACPClient fully initialized');
   }
 
   stop(): void {
@@ -234,9 +300,15 @@ export class ACPClient {
 
     if (msg["method"] !== undefined && msg["id"] !== undefined) {
       const id = msg["id"] as number;
+      const method = msg["method"] as string;
       const params = (msg["params"] ?? null) as JSONValue;
-      console.log(`[ACP DEBUG] Incoming request: method=${msg["method"]} id=${id}`);
-      this.incomingRequestHandler?.(id, params);
+      console.log(`[ACP-DIAG] Incoming request from server: method=${method} id=${id}`);
+      if (this.incomingRequestHandler) {
+        console.log(`[ACP-DIAG] Dispatching to incomingRequestHandler`);
+        this.incomingRequestHandler(id, params);
+      } else {
+        console.log(`[ACP-DIAG] WARNING: No incomingRequestHandler set! Request method=${method} id=${id} will go unanswered. Server will hang waiting for response.`);
+      }
       return;
     }
 
@@ -248,10 +320,14 @@ export class ACPClient {
         if (pending) {
           this.pendingRequests.delete(id);
           if (response.error) {
+            console.log(`[ACP-DIAG] Response error for id=${id}: ${response.error.message}`);
             pending.reject(this.mapRPCError(response.error));
           } else {
+            console.log(`[ACP-DIAG] Response OK for id=${id}`);
             pending.resolve((response.result ?? null) as JSONValue);
           }
+        } else {
+          console.log(`[ACP-DIAG] WARNING: Received response for id=${id} but no pending request found`);
         }
         return;
       }
@@ -260,6 +336,7 @@ export class ACPClient {
     if (msg["method"] !== undefined && msg["id"] === undefined) {
       const method = msg["method"] as string;
       const params = (msg["params"] ?? undefined) as JSONValue | undefined;
+      console.log(`[ACP-DIAG] Notification from server: method=${method}`);
       this.notificationHandler?.(method, params);
     }
   }

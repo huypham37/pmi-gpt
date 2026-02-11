@@ -4,10 +4,10 @@
  * Global app-level settings that apply across all workspaces.
  *
  * Settings:
+ * - Default Model (ACP model selection)
  * - Notifications
  * - About (version, updates)
  *
- * Note: API Connection settings have been removed — OpenCode handles auth/model config.
  * Note: Appearance settings (theme, font) have been moved to AppearanceSettingsPage.
  */
 
@@ -19,12 +19,14 @@ import { HeaderMenu } from '@/components/ui/HeaderMenu'
 import { routes } from '@/lib/navigate'
 import { Spinner } from '@craft-agent/ui'
 import type { DetailsPageMeta } from '@/lib/navigation-registry'
+import { MODELS, DEFAULT_MODEL } from '@craft-agent/shared/config/models'
 
 import {
   SettingsSection,
   SettingsCard,
   SettingsRow,
   SettingsToggle,
+  SettingsMenuSelectRow,
 } from '@/components/settings'
 import { useUpdateChecker } from '@/hooks/useUpdateChecker'
 
@@ -38,6 +40,9 @@ export const meta: DetailsPageMeta = {
 // ============================================
 
 export default function AppSettingsPage() {
+  // Model state — uses client-side lookup table, not server fetch
+  const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL)
+
   // Notifications state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
 
@@ -54,18 +59,35 @@ export default function AppSettingsPage() {
     }
   }, [updateChecker])
 
-  // Load notifications setting on mount
+  // Load settings on mount
   useEffect(() => {
     if (!window.electronAPI) return
+
+    // Load notifications
     window.electronAPI.getNotificationsEnabled()
       .then(setNotificationsEnabled)
-      .catch((error: unknown) => console.error('Failed to load settings:', error))
+      .catch((error: unknown) => console.error('Failed to load notification settings:', error))
+
+    // Load current model from storage
+    window.electronAPI.getModel()
+      .then((model) => {
+        if (model) setCurrentModel(model)
+      })
+      .catch((error: unknown) => console.error('[AppSettings] Failed to load model:', error))
   }, [])
 
   const handleNotificationsEnabledChange = useCallback(async (enabled: boolean) => {
     setNotificationsEnabled(enabled)
     await window.electronAPI.setNotificationsEnabled(enabled)
   }, [])
+
+  const handleModelChange = useCallback(async (modelId: string) => {
+    setCurrentModel(modelId)
+    await window.electronAPI.setModel(modelId)
+  }, [])
+
+  // Build model options from client-side lookup table
+  const modelOptions = MODELS.map(m => ({ value: m.id, label: m.name }))
 
   return (
     <div className="h-full flex flex-col">
@@ -74,6 +96,19 @@ export default function AppSettingsPage() {
         <ScrollArea className="h-full">
           <div className="px-5 py-7 max-w-3xl mx-auto">
           <div className="space-y-8">
+            {/* Default Model */}
+            <SettingsSection title="Default Model" description="Select the AI model for new sessions.">
+              <SettingsCard>
+                <SettingsMenuSelectRow
+                  label="Model"
+                  description="AI model used when starting new chat sessions."
+                  value={currentModel}
+                  onValueChange={handleModelChange}
+                  options={modelOptions}
+                />
+              </SettingsCard>
+            </SettingsSection>
+
             {/* Notifications */}
             <SettingsSection title="Notifications">
               <SettingsCard>

@@ -1,6 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, statSync } from 'fs';
 import { join, dirname } from 'path';
-import { getCredentialManager } from '../credentials/index.ts';
+// Lazy-import credential manager to avoid pulling Node.js crypto into the renderer
+async function getCredentialManagerLazy() {
+  const { getCredentialManager } = await import('../credentials/index.ts');
+  return getCredentialManager();
+}
 import { getOrCreateLatestSession, type SessionConfig } from '../sessions/index.ts';
 import {
   discoverWorkspacesInDefaultLocation,
@@ -141,7 +145,7 @@ export function loadStoredConfig(): StoredConfig | null {
  * Get the Anthropic API key from credential store
  */
 export async function getAnthropicApiKey(): Promise<string | null> {
-  const manager = getCredentialManager();
+  const manager = await getCredentialManagerLazy();
   return manager.getApiKey();
 }
 
@@ -149,7 +153,7 @@ export async function getAnthropicApiKey(): Promise<string | null> {
  * Get the Claude OAuth token from credential store
  */
 export async function getClaudeOAuthToken(): Promise<string | null> {
-  const manager = getCredentialManager();
+  const manager = await getCredentialManagerLazy();
   return manager.getClaudeOAuth();
 }
 
@@ -592,7 +596,7 @@ export async function removeWorkspace(workspaceId: string): Promise<boolean> {
   saveConfig(config);
 
   // Clean up credential store credentials for this workspace
-  const manager = getCredentialManager();
+  const manager = await getCredentialManagerLazy();
   await manager.deleteWorkspaceCredentials(workspaceId);
 
   return true;

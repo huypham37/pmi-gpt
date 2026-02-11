@@ -262,6 +262,7 @@ app.whenReady().then(async () => {
     createApplicationMenu(windowManager)
 
     // Initialize session manager
+    mainLog.info('[STARTUP-DEBUG] Creating SessionManager...')
     sessionManager = new SessionManager()
     sessionManager.setWindowManager(windowManager)
 
@@ -269,13 +270,19 @@ app.whenReady().then(async () => {
     initNotificationService(windowManager)
 
     // Register IPC handlers (must happen before window creation)
+    mainLog.info('[STARTUP-DEBUG] Registering IPC handlers...')
     registerIpcHandlers(sessionManager, windowManager)
 
     // Create initial windows (restores from saved state or opens first workspace)
+    mainLog.info('[STARTUP-DEBUG] Creating initial windows...')
     await createInitialWindows()
+    mainLog.info('[STARTUP-DEBUG] Initial windows created')
 
     // Initialize auth (must happen after window creation for error reporting)
+    mainLog.info('[STARTUP-DEBUG] Starting sessionManager.initialize()...')
+    const initStart = Date.now()
     await sessionManager.initialize()
+    mainLog.info(`[STARTUP-DEBUG] sessionManager.initialize() completed in ${Date.now() - initStart}ms`)
 
     // Set Sentry context tags for error grouping (no PII — just config classification).
     // Runs after init so config and auth state are available.

@@ -3,7 +3,7 @@
  *
  * Renders content based on the unified NavigationState:
  * - Chats navigator: ChatPage for selected session, or empty state
- * - Settings navigator: AppSettingsPage only (MVP simplified)
+ * - Settings navigator: Routes to the correct settings subpage
  *
  * The NavigationState is the single source of truth for what to display.
  *
@@ -21,8 +21,17 @@ import {
   isChatsNavigation,
   isSettingsNavigation,
 } from '@/contexts/NavigationContext'
-// MVP: Simplified page imports - only core pages
-import { AppSettingsPage, ShortcutsPage, ChatPage } from '@/pages'
+import {
+  AppSettingsPage,
+  AppearanceSettingsPage,
+  InputSettingsPage,
+  WorkspaceSettingsPage,
+  PermissionsSettingsPage,
+  LabelsSettingsPage,
+  ShortcutsPage,
+  PreferencesPage,
+  ChatPage,
+} from '@/pages'
 
 export interface MainContentPanelProps {
   /** Whether the app is in focused mode (single chat, no sidebar) */
@@ -45,23 +54,35 @@ export function MainContentPanel({
     </StoplightProvider>
   )
 
-  // Settings navigator - MVP: only app settings and shortcuts
+  // Settings navigator - route to correct subpage
   if (isSettingsNavigation(navState)) {
-    switch (navState.subpage) {
-      case 'shortcuts':
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <ShortcutsPage />
-          </Panel>
-        )
-      case 'app':
-      default:
-        return wrapWithStoplight(
-          <Panel variant="grow" className={className}>
-            <AppSettingsPage />
-          </Panel>
-        )
+    const renderSettingsPage = () => {
+      switch (navState.subpage) {
+        case 'appearance':
+          return <AppearanceSettingsPage />
+        case 'input':
+          return <InputSettingsPage />
+        case 'workspace':
+          return <WorkspaceSettingsPage />
+        case 'permissions':
+          return <PermissionsSettingsPage />
+        case 'labels':
+          return <LabelsSettingsPage />
+        case 'shortcuts':
+          return <ShortcutsPage />
+        case 'preferences':
+          return <PreferencesPage />
+        case 'app':
+        default:
+          return <AppSettingsPage />
+      }
     }
+
+    return wrapWithStoplight(
+      <Panel variant="grow" className={className}>
+        {renderSettingsPage()}
+      </Panel>
+    )
   }
 
   // Chats navigator - show chat or empty state

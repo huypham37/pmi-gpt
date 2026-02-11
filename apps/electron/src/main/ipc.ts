@@ -119,9 +119,11 @@ async function validateFilePath(filePath: string): Promise<string> {
 export function registerIpcHandlers(sessionManager: SessionManager, windowManager: WindowManager): void {
   // Get all sessions
   ipcMain.handle(IPC_CHANNELS.GET_SESSIONS, async () => {
+    console.log('[IPC-DEBUG] GET_SESSIONS handler called')
     const end = perf.start('ipc.getSessions')
     const sessions = sessionManager.getSessions()
     end()
+    console.log(`[IPC-DEBUG] GET_SESSIONS returning ${sessions.length} sessions`)
     return sessions
   })
 
@@ -158,8 +160,11 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
 
   // Ensure default workspace exists (for internal OpenCode use - skips auth)
   ipcMain.handle(IPC_CHANNELS.ENSURE_DEFAULT_WORKSPACE, async () => {
+    console.log('[IPC-DEBUG] ENSURE_DEFAULT_WORKSPACE handler called')
     const { ensureDefaultWorkspace } = await import('@craft-agent/shared/config')
-    return ensureDefaultWorkspace()
+    const result = ensureDefaultWorkspace()
+    console.log(`[IPC-DEBUG] ENSURE_DEFAULT_WORKSPACE returning workspace: ${result?.id}`)
+    return result
   })
 
   // ============================================================
@@ -1185,6 +1190,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     setMode(mode)
     ipcLog.info(`Mode updated to: ${mode ?? '(default)'}`)
   })
+
 
   // ============================================================
   // Settings - Model (Global Default)

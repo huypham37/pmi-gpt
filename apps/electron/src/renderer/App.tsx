@@ -150,7 +150,10 @@ export default function App() {
 
   // App state: loading -> check auth -> onboarding or ready
   // MVP: Initialize to 'ready' to bypass onboarding (internal OpenCode use)
-  const [appState, setAppState] = useState<AppState>('ready')
+  const [appState, setAppState] = useState<AppState>(() => {
+    console.log('[RENDERER-DEBUG] App component initializing, appState = ready')
+    return 'ready'
+  })
   const [setupNeeds, setSetupNeeds] = useState<SetupNeeds | null>(null)
 
   // Per-session Jotai atom setters for isolated updates
@@ -219,16 +222,20 @@ export default function App() {
 
   // Compute if app is fully ready (all data loaded)
   const isFullyReady = appState === 'ready' && sessionsLoaded
+  console.log(`[RENDERER-DEBUG] Render cycle: appState=${appState}, sessionsLoaded=${sessionsLoaded}, isFullyReady=${isFullyReady}, splashExiting=${splashExiting}, splashHidden=${splashHidden}`)
 
   // Trigger splash exit animation when fully ready
   useEffect(() => {
+    console.log(`[RENDERER-DEBUG] Splash exit effect: isFullyReady=${isFullyReady}, splashExiting=${splashExiting}`)
     if (isFullyReady && !splashExiting) {
+      console.log('[RENDERER-DEBUG] Setting splashExiting=true')
       setSplashExiting(true)
     }
   }, [isFullyReady, splashExiting])
 
   // Handler for when splash exit animation completes
   const handleSplashExitComplete = useCallback(() => {
+    console.log('[RENDERER-DEBUG] Splash exit animation complete, setting splashHidden=true')
     setSplashHidden(true)
   }, [])
 
@@ -309,11 +316,14 @@ export default function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
+        console.log('[RENDERER-DEBUG] Init useEffect: calling ensureDefaultWorkspace...')
         // Ensure default workspace exists (creates ~/.craft-agent/workspaces/default/ on first launch)
         const workspace = await window.electronAPI.ensureDefaultWorkspace()
+        console.log(`[RENDERER-DEBUG] Init useEffect: ensureDefaultWorkspace returned workspace id=${workspace?.id}`)
 
         // Get this window's workspace ID (passed via URL query param from main process)
         let wsId = await window.electronAPI.getWindowWorkspace()
+        console.log(`[RENDERER-DEBUG] Init useEffect: getWindowWorkspace returned wsId=${wsId}`)
 
         // If no workspace ID assigned to window, use the default workspace
         if (!wsId && workspace) {
@@ -322,9 +332,10 @@ export default function App() {
         setWindowWorkspaceId(wsId)
 
         // Go directly to ready state - no auth check needed for internal use
+        console.log('[RENDERER-DEBUG] Init useEffect: setting appState=ready')
         setAppState('ready')
       } catch (error) {
-        console.error('Failed to initialize:', error)
+        console.error('[RENDERER-DEBUG] Init useEffect FAILED:', error)
         // Even on error, try to proceed to ready state
         setAppState('ready')
       }
@@ -354,9 +365,12 @@ export default function App() {
   useEffect(() => {
     if (appState !== 'ready') return
 
+    console.log('[RENDERER-DEBUG] Data loading useEffect: appState is ready, starting data fetch...')
     window.electronAPI.getWorkspaces().then(setWorkspaces)
     window.electronAPI.getNotificationsEnabled().then(setNotificationsEnabled)
+    console.log('[RENDERER-DEBUG] Data loading: calling getSessions()...')
     window.electronAPI.getSessions().then((loadedSessions) => {
+      console.log(`[RENDERER-DEBUG] Data loading: getSessions() returned ${loadedSessions.length} sessions`)
       // Initialize per-session atoms and metadata map
       // NOTE: No sessionsAtom used - sessions are only in per-session atoms
       initializeSessions(loadedSessions)
@@ -376,6 +390,7 @@ export default function App() {
       }
       setSessionOptions(optionsMap)
       // Mark sessions as loaded for splash screen
+      console.log('[RENDERER-DEBUG] Data loading: setting sessionsLoaded=true')
       setSessionsLoaded(true)
 
       // If window was opened with a specific session (via "Open in New Window"), select it
@@ -385,6 +400,10 @@ export default function App() {
           navigate(routes.view.allChats(session.id))
         }
       }
+    }).catch((error) => {
+      console.error('[RENDERER-DEBUG] getSessions() FAILED:', error)
+      // Still set sessionsLoaded to dismiss splash even on error
+      setSessionsLoaded(true)
     })
     // Load stored model preference
     window.electronAPI.getModel().then((storedModel) => {

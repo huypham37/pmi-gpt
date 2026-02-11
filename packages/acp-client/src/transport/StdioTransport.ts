@@ -24,6 +24,7 @@ export class StdioTransport implements Transport {
   }
 
   async start(): Promise<void> {
+    console.log(`[TRANSPORT-DEBUG] StdioTransport.start() - executable: ${this.executablePath}, args: ${this.args.join(' ')}, cwd: ${this.workingDirectory}`);
     const env = this.environment
       ? { ...process.env, ...this.environment }
       : undefined;
@@ -36,15 +37,21 @@ export class StdioTransport implements Transport {
         stdio: ["pipe", "pipe", "pipe"],
       });
     } catch (err) {
+      console.log(`[TRANSPORT-DEBUG] spawn() threw synchronously: ${err instanceof Error ? err.message : String(err)}`);
       throw ACPError.transportError(
         `Failed to start process: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
 
+    console.log(`[TRANSPORT-DEBUG] spawn() returned, pid: ${child.pid}`);
     this.process = child;
 
     child.on("error", (err) => {
       console.log(`[ACP STDERR] Process error: ${err.message}`);
+    });
+
+    child.on("exit", (code, signal) => {
+      console.log(`[TRANSPORT-DEBUG] Process exited - code: ${code}, signal: ${signal}`);
     });
 
     child.stderr?.on("data", (chunk: Buffer) => {
