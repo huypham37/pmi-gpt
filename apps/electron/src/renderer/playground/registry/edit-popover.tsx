@@ -12,6 +12,7 @@ import { ensureMockElectronAPI } from '../mock-utils'
 import { GripHorizontal, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { DEFAULT_MODEL } from '@config/models'
 
 // Ensure mock electronAPI is available before any component renders
 ensureMockElectronAPI()
@@ -99,7 +100,6 @@ function CompactChatPreview({
   isProcessing = false,
   placeholder = "Describe what you'd like to change...",
 }: CompactChatPreviewProps) {
-  const [model, setModel] = useState('haiku')
   const session = createSession(messages, isProcessing)
 
   // Drag state for movable preview
@@ -226,8 +226,7 @@ function CompactChatPreview({
               onSendMessage={handleSendMessage}
               onOpenFile={handleOpenFile}
               onOpenUrl={handleOpenUrl}
-              currentModel={model}
-              onModelChange={setModel}
+
               compactMode={true}
               placeholder={placeholder}
             />
@@ -256,7 +255,7 @@ const mockAppShellContext = {
   activeSessionId: null,
   pendingPermissions: new Map(),
   pendingCredentials: new Map(),
-  currentModel: 'haiku',
+  currentModel: DEFAULT_MODEL,
   customModel: null,
   sessionOptions: new Map(),
   getDraft: () => '',

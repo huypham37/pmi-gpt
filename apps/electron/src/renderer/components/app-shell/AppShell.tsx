@@ -461,7 +461,6 @@ function AppShellContent({
   const {
     workspaces,
     activeWorkspaceId,
-    currentModel,
     sessionOptions,
     onSelectWorkspace,
     onRefreshWorkspaces,

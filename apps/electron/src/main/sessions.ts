@@ -36,6 +36,7 @@ import {
   type SessionMetadata,
   type TodoState,
   type AgentProfile,
+  profileToMode,
 } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, SERVER_BUILD_ERRORS } from '@craft-agent/shared/sources'
 import { ConfigWatcher, type ConfigWatcherCallbacks } from '@craft-agent/shared/config'
@@ -367,7 +368,7 @@ interface ManagedSession {
   authRetryInProgress?: boolean
   // Whether this session is hidden from session list (e.g., mini edit sessions)
   hidden?: boolean
-  // Agent profile for this session (chat, agent, testcase) - defaults to 'chat'
+  // Agent profile for this session (chat, agent, testcase) - defaults to 'testcase'
   profile?: AgentProfile
   // Pending ACP permission request (for responding to permission prompts)
   pendingACPPermissionRequest?: ACPPermissionRequest
@@ -1473,8 +1474,8 @@ export class SessionManager {
         sessionLog.warn(`[ACP-DIAG] Failed to set model ${resolvedModel}:`, e)
       }
 
-      // Set mode from config (falls back to 'build' if not configured)
-      const resolvedMode = getMode() || 'build'
+      // Set mode from session profile (falls back to stored config, then 'testcase-generator')
+      const resolvedMode = (managed.profile ? profileToMode(managed.profile) : null) || getMode() || 'testcase-generator'
       sessionLog.info(`[ACP-DIAG] Setting mode to: ${resolvedMode}`)
       try {
         await managed.acpSession.setMode(resolvedMode)
@@ -2658,10 +2659,16 @@ To view this task's output:
   /**
    * Set the agent profile for a session ('chat', 'agent', 'testcase')
    */
-  setSessionProfile(sessionId: string, profile: AgentProfile): void {
+  async setSessionProfile(sessionId: string, profile: AgentProfile): Promise<void> {
     const managed = this.sessions.get(sessionId)
     if (managed) {
       managed.profile = profile
+
+      if (managed.acpSession) {
+        const mode = profileToMode(profile)
+        await managed.acpSession.setMode(mode)
+        sessionLog.info(`[ACP-DIAG] Profile changed to '${profile}', mode set to '${mode}'`)
+      }
 
       this.sendEvent({
         type: 'session_profile_changed',

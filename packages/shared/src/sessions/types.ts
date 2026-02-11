@@ -35,6 +35,21 @@ export type BuiltInStatusId = 'todo' | 'in-progress' | 'needs-review' | 'done' |
 export type AgentProfile = 'chat' | 'agent' | 'testcase';
 
 /**
+ * Maps an AgentProfile to an OpenCode ACP mode.
+ * - chat → plan (read-only, conversational)
+ * - agent → build (full tool access)
+ * - testcase → testcase-generator (test generation mode)
+ */
+export function profileToMode(profile: AgentProfile): string {
+  switch (profile) {
+    case 'chat': return 'plan'
+    case 'agent': return 'build'
+    case 'testcase': return 'testcase-generator'
+    default: return 'testcase-generator'
+  }
+}
+
+/**
  * Session token usage tracking
  */
 export interface SessionTokenUsage {
@@ -114,7 +129,7 @@ export interface SessionConfig {
   };
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean;
-  /** Agent profile for this session (chat, agent, testcase) - defaults to 'chat' */
+  /** Agent profile for this session (chat, agent, testcase) - defaults to 'testcase' */
   profile?: AgentProfile;
 }
 
@@ -187,7 +202,7 @@ export interface SessionHeader {
   };
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean;
-  /** Agent profile for this session (chat, agent, testcase) - defaults to 'chat' */
+  /** Agent profile for this session (chat, agent, testcase) - defaults to 'testcase' */
   profile?: AgentProfile;
   // Pre-computed fields for fast list loading
   /** Number of messages in session */
@@ -255,6 +270,6 @@ export interface SessionMetadata {
   tokenUsage?: SessionTokenUsage;
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean;
-  /** Agent profile for this session (chat, agent, testcase) - defaults to 'chat' */
+  /** Agent profile for this session (chat, agent, testcase) - defaults to 'testcase' */
   profile?: AgentProfile;
 }

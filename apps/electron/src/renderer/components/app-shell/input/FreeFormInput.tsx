@@ -9,7 +9,8 @@ import {
   Check,
   DatabaseZap,
   ChevronDown,
-  Loader2,
+
+
 } from 'lucide-react'
 import { Icon_Home, Icon_Folder } from '@craft-agent/ui'
 
@@ -38,22 +39,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@craft-agent/ui'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuPortal,
+
 } from '@/components/ui/dropdown-menu'
 import {
   StyledDropdownMenuContent,
   StyledDropdownMenuItem,
-  StyledDropdownMenuSeparator,
-  StyledDropdownMenuSubTrigger,
-  StyledDropdownMenuSubContent,
+
 } from '@/components/ui/styled-dropdown'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { isMac, PATH_SEP, getPathBasename } from '@/lib/platform'
 import { applySmartTypography } from '@/lib/smart-typography'
 import { AttachmentPreview } from '../AttachmentPreview'
-import { MODELS, getModelShortName, getModelContextWindow, isClaudeModel } from '@config/models'
+import { getModelContextWindow, DEFAULT_MODEL } from '@config/models'
 import { useOptionalAppShellContext } from '@/context/AppShellContext'
 import { EditPopover, getEditConfig } from '@/components/ui/EditPopover'
 import { SourceAvatar } from '@/components/ui/source-avatar'
@@ -116,10 +114,6 @@ export interface FreeFormInputProps {
   onStop?: (silent?: boolean) => void
   /** External ref for the input */
   inputRef?: React.RefObject<RichTextInputHandle>
-  /** Current model ID */
-  currentModel: string
-  /** Callback when model changes */
-  onModelChange: (model: string) => void
   // Profile selection
   /** Current agent profile ('chat', 'agent', 'testcase') */
   profile?: AgentProfile
@@ -201,7 +195,7 @@ export interface FreeFormInputProps {
  * - Auto-growing textarea
  * - File attachments via button or drag-drop
  * - Slash commands menu
- * - Model selector
+ * - Model selection managed in Settings
  * - Active option badges
  */
 export function FreeFormInput({
@@ -211,9 +205,7 @@ export function FreeFormInput({
   onSubmit,
   onStop,
   inputRef: externalInputRef,
-  currentModel,
-  onModelChange,
-  profile = 'chat',
+  profile = 'testcase',
   onProfileChange,
   thinkingLevel = 'think',
   onThinkingLevelChange,
@@ -336,7 +328,6 @@ export function FreeFormInput({
   const [sourceFilter, setSourceFilter] = React.useState('')
   const [isFocused, setIsFocused] = React.useState(false)
   const [inputMaxHeight, setInputMaxHeight] = React.useState(540)
-  const [modelDropdownOpen, setModelDropdownOpen] = React.useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = React.useState(false)
 
   // Input settings (loaded from config)
@@ -1565,140 +1556,11 @@ export function FreeFormInput({
             </StyledDropdownMenuContent>
           </DropdownMenu>
           )}
-          {/* 5. Model Selector - Hidden in compact mode (EditPopover embedding) */}
-          {!compactMode && (
-          <DropdownMenu open={modelDropdownOpen} onOpenChange={setModelDropdownOpen}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      "inline-flex items-center h-7 px-1.5 gap-0.5 text-[13px] shrink-0 rounded-[6px] hover:bg-foreground/5 transition-colors select-none",
-                      modelDropdownOpen && "bg-foreground/5"
-                    )}
-                  >
-                    {/* Show custom model name when a custom API connection is active */}
-                    {getModelShortName(customModel || currentModel)}
-                    {!customModel && <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />}
-                  </button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">Model</TooltipContent>
-            </Tooltip>
-            <StyledDropdownMenuContent side="top" align="end" sideOffset={8} className="min-w-[240px]">
-              {/* When custom model is active, show it as a static item instead of Anthropic options */}
-              {customModel ? (
-                <StyledDropdownMenuItem
-                  disabled
-                  className="flex items-center justify-between px-2 py-2 rounded-lg"
-                >
-                  <div className="text-left">
-                    <div className="font-medium text-sm">{customModel}</div>
-                    <div className="text-xs text-muted-foreground">Custom API connection</div>
-                  </div>
-                  <Check className="h-4 w-4 text-foreground shrink-0 ml-3" />
-                </StyledDropdownMenuItem>
-              ) : (
-                /* Standard Anthropic model options */
-                MODELS.map((model) => {
-                  const isSelected = currentModel === model.id
-                  const descriptions: Record<string, string> = {
-                    'claude-opus-4-5-20251101': 'Most capable for complex work',
-                    'claude-sonnet-4-5-20250929': 'Best for everyday tasks',
-                    'claude-haiku-4-5-20251001': 'Fastest for quick answers',
-                  }
-                  return (
-                    <StyledDropdownMenuItem
-                      key={model.id}
-                      onSelect={() => onModelChange(model.id)}
-                      className="flex items-center justify-between px-2 py-2 rounded-lg cursor-pointer"
-                    >
-                      <div className="text-left">
-                        <div className="font-medium text-sm">{model.name}</div>
-                        <div className="text-xs text-muted-foreground">{descriptions[model.id] || model.description}</div>
-                      </div>
-                      {isSelected && (
-                        <Check className="h-4 w-4 text-foreground shrink-0 ml-3" />
-                      )}
-                    </StyledDropdownMenuItem>
-                  )
-                })
-              )}
-
-              {/* Thinking level selector — only shown for Claude models (extended thinking is Claude-specific) */}
-              {(!customModel || isClaudeModel(customModel)) && (
-                <>
-                  <StyledDropdownMenuSeparator className="my-1" />
-
-                  <DropdownMenuSub>
-                    <StyledDropdownMenuSubTrigger className="flex items-center justify-between px-2 py-2 rounded-lg">
-                      <div className="text-left flex-1">
-                        <div className="font-medium text-sm">{getThinkingLevelName(thinkingLevel)}</div>
-                        <div className="text-xs text-muted-foreground">Extended reasoning depth</div>
-                      </div>
-                    </StyledDropdownMenuSubTrigger>
-                    <StyledDropdownMenuSubContent className="min-w-[220px]">
-                      {THINKING_LEVELS.map(({ id, name, description }) => {
-                        const isSelected = thinkingLevel === id
-                        return (
-                          <StyledDropdownMenuItem
-                            key={id}
-                            onSelect={() => onThinkingLevelChange?.(id)}
-                            className="flex items-center justify-between px-2 py-2 rounded-lg cursor-pointer"
-                          >
-                            <div className="text-left">
-                              <div className="font-medium text-sm">{name}</div>
-                              <div className="text-xs text-muted-foreground">{description}</div>
-                            </div>
-                            {isSelected && (
-                              <Check className="h-4 w-4 text-foreground shrink-0 ml-3" />
-                            )}
-                          </StyledDropdownMenuItem>
-                        )
-                      })}
-                    </StyledDropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </>
-              )}
-
-              {/* Context usage footer - only show when we have token data */}
-              {contextStatus?.inputTokens != null && contextStatus.inputTokens > 0 && (
-                <>
-                  <StyledDropdownMenuSeparator className="my-1" />
-                  <div className="px-2 py-1.5 select-none">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Context</span>
-                      <span className="flex items-center gap-1.5">
-                        {contextStatus.isCompacting && (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        )}
-                        {formatTokenCount(contextStatus.inputTokens)}
-                        {/* Show compaction threshold (~77.5% of context window) as the limit,
-                            since that's when auto-compaction kicks in - not the full context window.
-                            Falls back to known model context window when SDK hasn't reported usage yet. */}
-                        {(() => {
-                          const ctxWindow = contextStatus.contextWindow || getModelContextWindow(customModel || currentModel)
-                          return ctxWindow ? (
-                            <span className="opacity-60">/ {formatTokenCount(Math.round(ctxWindow * 0.775))}</span>
-                          ) : null
-                        })()}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </StyledDropdownMenuContent>
-          </DropdownMenu>
-          )}
+          {/* 5. Model Selector - Removed: model selection is now only in Settings */}
 
           {/* 5.5 Context Usage Warning Badge - shows when approaching auto-compaction threshold */}
           {(() => {
-            // Calculate usage percentage based on compaction threshold (~77.5% of context window),
-            // not the full context window - this gives users meaningful warnings before compaction kicks in.
-            // SDK triggers compaction at ~155k tokens for a 200k context window.
-            // Falls back to known per-model context window when SDK hasn't reported usage yet.
-            const effectiveContextWindow = contextStatus?.contextWindow || getModelContextWindow(customModel || currentModel)
+            const effectiveContextWindow = contextStatus?.contextWindow || getModelContextWindow(customModel || DEFAULT_MODEL)
             const compactionThreshold = effectiveContextWindow
               ? Math.round(effectiveContextWindow * 0.775)
               : null

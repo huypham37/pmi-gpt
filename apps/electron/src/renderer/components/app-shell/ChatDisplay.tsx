@@ -96,9 +96,6 @@ interface ChatDisplayProps {
   onSendMessage: (message: string, attachments?: FileAttachment[], skillSlugs?: string[]) => void
   onOpenFile: (path: string) => void
   onOpenUrl: (url: string) => void
-  // Model selection
-  currentModel: string
-  onModelChange: (model: string) => void
   // Profile selection
   profile?: AgentProfile
   onProfileChange?: (profile: AgentProfile) => void
@@ -374,8 +371,6 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
   onSendMessage,
   onOpenFile,
   onOpenUrl,
-  currentModel,
-  onModelChange,
   profile,
   onProfileChange,
   textareaRef: externalTextareaRef,
@@ -1538,8 +1533,6 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
               onSubmit={handleSubmit}
               onStop={handleStop}
               textareaRef={textareaRef}
-              currentModel={currentModel}
-              onModelChange={onModelChange}
               profile={profile}
               onProfileChange={onProfileChange}
               thinkingLevel={thinkingLevel}

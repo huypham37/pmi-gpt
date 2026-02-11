@@ -35,7 +35,6 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
 
   const {
     activeWorkspaceId,
-    currentModel,
     onSendMessage,
     onOpenFile,
     onOpenUrl,
@@ -162,23 +161,13 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
     onInputChange(sessionId, value)
   }, [sessionId, onInputChange])
 
-  // Session model change handler - persists per-session model
-  const handleModelChange = React.useCallback((model: string) => {
-    if (activeWorkspaceId) {
-      window.electronAPI.setSessionModel(sessionId, activeWorkspaceId, model)
-    }
-  }, [sessionId, activeWorkspaceId])
-
   // Session profile change handler - persists per-session profile
   const handleProfileChange = React.useCallback((profile: AgentProfile) => {
     window.electronAPI.sessionCommand(sessionId, { type: 'setProfile', profile })
   }, [sessionId])
 
-  // Effective model for this session (session-specific or global fallback)
-  const effectiveModel = session?.model || currentModel
-
   // Effective profile for this session
-  const effectiveProfile = session?.profile || 'chat'
+  const effectiveProfile = session?.profile || 'testcase'
 
   // Working directory for this session
   const workingDirectory = session?.workingDirectory
@@ -462,8 +451,6 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
                 onSendMessage={() => {}}
                 onOpenFile={handleOpenFile}
                 onOpenUrl={handleOpenUrl}
-                currentModel={effectiveModel}
-                onModelChange={handleModelChange}
                 profile={effectiveProfile}
                 onProfileChange={handleProfileChange}
                 textareaRef={textareaRef}
@@ -535,8 +522,6 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
             }}
             onOpenFile={handleOpenFile}
             onOpenUrl={handleOpenUrl}
-            currentModel={effectiveModel}
-            onModelChange={handleModelChange}
             profile={effectiveProfile}
             onProfileChange={handleProfileChange}
             textareaRef={textareaRef}

@@ -20,6 +20,8 @@ export type {
   AgentProfile,
 } from './types.ts';
 
+export { profileToMode } from './types.ts';
+
 // Storage functions
 export {
   // Directory utilities

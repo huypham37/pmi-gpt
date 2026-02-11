@@ -28,7 +28,7 @@ export const MODELS: ModelDefinition[] = [
 // ============================================
 
 /** Default model for main chat (user-facing) */
-export const DEFAULT_MODEL = 'github-copilot/gpt-5-mini';
+export const DEFAULT_MODEL = 'lmstudio/openai/gpt-oss-20b';
 
 /** Model for agent definition extraction (always high quality) */
 export const EXTRACTION_MODEL = 'github-copilot/gpt-5-mini';

@@ -494,7 +494,6 @@ function ActiveTasksBarContext({ tasks = sampleBackgroundTasks }: ActiveTasksBar
           placeholder="Message Craft Agent..."
           disabled={false}
           isProcessing={false}
-          currentModel="claude-sonnet-4-5-20250929"
           permissionMode={permissionMode}
           onPermissionModeChange={setPermissionMode}
           ultrathinkEnabled={ultrathinkEnabled}
@@ -504,7 +503,7 @@ function ActiveTasksBarContext({ tasks = sampleBackgroundTasks }: ActiveTasksBar
           workingDirectory="/Users/demo/projects/craft-agent"
           sessionId="playground-session"
           onSubmit={mockInputCallbacks.onSubmit}
-          onModelChange={mockInputCallbacks.onModelChange}
+
           onInputChange={mockInputCallbacks.onInputChange}
           onHeightChange={mockInputCallbacks.onHeightChange}
           onFocusChange={mockInputCallbacks.onFocusChange}
@@ -602,7 +601,6 @@ function PermissionInputToggle({ autoToggle = false, autoToggleInterval = 3000, 
         placeholder="Message Craft Agent..."
         disabled={false}
         isProcessing={false}
-        currentModel="claude-sonnet-4-5-20250929"
         permissionMode={permissionMode}
         onPermissionModeChange={setPermissionMode}
         ultrathinkEnabled={ultrathinkEnabled}
@@ -614,7 +612,6 @@ function PermissionInputToggle({ autoToggle = false, autoToggleInterval = 3000, 
         structuredInput={structuredInput}
         onStructuredResponse={handlePermissionResponse}
         onSubmit={mockInputCallbacks.onSubmit}
-        onModelChange={mockInputCallbacks.onModelChange}
         onInputChange={mockInputCallbacks.onInputChange}
         onHeightChange={mockInputCallbacks.onHeightChange}
         onFocusChange={mockInputCallbacks.onFocusChange}
@@ -943,19 +940,7 @@ export const chatComponents: ComponentEntry[] = [
         control: { type: 'string', placeholder: 'Message...' },
         defaultValue: 'Message Craft Agent...',
       },
-      {
-        name: 'currentModel',
-        description: 'Current selected model',
-        control: {
-          type: 'select',
-          options: [
-            { label: 'Sonnet 4.5', value: 'claude-sonnet-4-5-20250929' },
-            { label: 'Opus 4.5', value: 'claude-opus-4-5-20251101' },
-            { label: 'Haiku 3.5', value: 'claude-3-5-haiku-20241022' },
-          ],
-        },
-        defaultValue: 'claude-sonnet-4-5-20250929',
-      },
+
       {
         name: 'permissionMode',
         description: 'Permission mode badge',
