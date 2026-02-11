@@ -1,7 +1,6 @@
 import * as React from 'react'
 import type { ComponentEntry } from './types'
 import { cn } from '@/lib/utils'
-import { MODELS } from '@config/models'
 import type { PermissionMode } from '@craft-agent/shared/agent/modes'
 
 // Import REAL components from the main app
@@ -29,7 +28,6 @@ interface FreeFormInputPlaygroundProps {
   placeholder?: string
   disabled?: boolean
   isProcessing?: boolean
-  currentModel: string
   ultrathinkEnabled?: boolean
   permissionMode?: PermissionMode
   inputValue?: string
@@ -41,7 +39,6 @@ function FreeFormInputPlayground({
   placeholder = 'Message...',
   disabled = false,
   isProcessing = false,
-  currentModel,
   ultrathinkEnabled = false,
   permissionMode = 'ask',
   inputValue,
@@ -49,11 +46,9 @@ function FreeFormInputPlayground({
   unstyled = false,
 }: FreeFormInputPlaygroundProps) {
   // Local state for options since playground doesn't have parent state management
-  const [model, setModel] = React.useState(currentModel)
   const [ultrathink, setUltrathink] = React.useState(ultrathinkEnabled)
   const [mode, setMode] = React.useState<PermissionMode>(permissionMode)
 
-  React.useEffect(() => setModel(currentModel), [currentModel])
   React.useEffect(() => setUltrathink(ultrathinkEnabled), [ultrathinkEnabled])
   React.useEffect(() => setMode(permissionMode), [permissionMode])
 
@@ -62,8 +57,6 @@ function FreeFormInputPlayground({
       placeholder={placeholder}
       disabled={disabled}
       isProcessing={isProcessing}
-      currentModel={model}
-      onModelChange={setModel}
       ultrathinkEnabled={ultrathink}
       onUltrathinkChange={setUltrathink}
       permissionMode={mode}
@@ -202,8 +195,6 @@ function InputTransitions() {
             structuredInput={structuredInput}
             onStructuredResponse={handleStructuredResponse}
             // FreeFormInput props
-            currentModel={model}
-            onModelChange={setModel}
             inputValue={inputValue}
             onInputChange={setInputValue}
             onSubmit={() => {}}
@@ -258,15 +249,6 @@ export const inputComponents: ComponentEntry[] = [
         defaultValue: false,
       },
       {
-        name: 'currentModel',
-        description: 'Currently selected model',
-        control: {
-          type: 'select',
-          options: MODELS.map(m => ({ label: m.name, value: m.id })),
-        },
-        defaultValue: 'claude-sonnet-4-20250514',
-      },
-      {
         name: 'safeModeEnabled',
         description: 'Safe mode badge active',
         control: { type: 'boolean' },
@@ -280,10 +262,10 @@ export const inputComponents: ComponentEntry[] = [
       },
     ],
     variants: [
-      { name: 'Default', props: { currentModel: 'claude-sonnet-4-20250514' } },
-      { name: 'With Badges', props: { currentModel: 'claude-sonnet-4-20250514', permissionMode: 'safe' as PermissionMode, ultrathinkEnabled: true } },
-      { name: 'Processing', props: { currentModel: 'claude-sonnet-4-20250514', isProcessing: true } },
-      { name: 'Disabled', props: { currentModel: 'claude-sonnet-4-20250514', disabled: true } },
+      { name: 'Default', props: {} },
+      { name: 'With Badges', props: { permissionMode: 'safe' as PermissionMode, ultrathinkEnabled: true } },
+      { name: 'Processing', props: { isProcessing: true } },
+      { name: 'Disabled', props: { disabled: true } },
     ],
     mockData: () => ({}),
   },

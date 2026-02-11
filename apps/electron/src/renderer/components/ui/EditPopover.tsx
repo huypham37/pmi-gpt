@@ -681,9 +681,6 @@ export function EditPopover({
   // Pass empty string when no session yet - atom returns null for unknown IDs
   const inlineSession = useSession(inlineSessionId || '')
 
-  // Model state for ChatDisplay (starts with prop value, can be changed by user)
-  const [currentModel, setCurrentModel] = useState(model || 'haiku')
-
   // Create a stub session for ChatDisplay when no real session exists yet
   // This allows showing the input before the first message is sent
   const stubSession = useMemo((): Session => ({
@@ -855,7 +852,6 @@ export function EditPopover({
   // Reset state when popover opens
   useEffect(() => {
     if (open) {
-      setCurrentModel(model || 'haiku')
       resetInlineSession()
     }
   }, [open, model, resetInlineSession])
@@ -960,8 +956,6 @@ export function EditPopover({
                   onSendMessage={inlineExecution ? handleInlineSendMessage : handleLegacySendMessage}
                   onOpenFile={onOpenFile || (() => {})}
                   onOpenUrl={onOpenUrl || (() => {})}
-                  currentModel={currentModel}
-                  onModelChange={setCurrentModel}
                   compactMode={true}
                   placeholder={placeholder}
                   emptyStateLabel={context.label}
