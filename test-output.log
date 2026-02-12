@@ -1,0 +1,186 @@
+Working directory: C:\Users\huy.pham\Documents\01-Working\projects\PMI-GPT
+Starting opencode acp...
+
+============================================================
+STEP 1: Initialize
+============================================================
+
+>>> SENT: initialize (id=1)
+  [DEBUG] Payload: {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": 1, "clientInfo": {"name": "test-acp", "title": "ACP Test Script", "version": "0.0.1"}, "clientCapabilities": {"fs": {"readTextFile": false, "writeTextFile": false}, "terminal": false}}}
+  [DEBUG] << {"jsonrpc": "2.0", "id": 1, "result": {"protocolVersion": 1, "agentCapabilities": {"loadSession": true, "mcpCapabilities": {"http": true, "sse": true}, "promptCapabilities": {"embeddedContext": true, "image": true}, "sessionCapabilities": {"fork": {}, "list": {}, "resume": {}}}, "authMethods": [{"description": "Run `opencode auth login` in the terminal", "name": "Login with opencode", "id": "opencode-login"}], "agentInfo": {"name": "OpenCode", "version": "1.1.56"}}}
+  (took 2.8s)
+  Agent: OpenCode v1.1.56
+  Protocol: 1
+  Agent capabilities: {"loadSession": true, "mcpCapabilities": {"http": true, "sse": true}, "promptCapabilities": {"embeddedContext": true, "image": true}, "sessionCapabilities": {"fork": {}, "list": {}, "resume": {}}}
+  [DEBUG] Full init result: {"protocolVersion": 1, "agentCapabilities": {"loadSession": true, "mcpCapabilities": {"http": true, "sse": true}, "promptCapabilities": {"embeddedContext": true, "image": true}, "sessionCapabilities": {"fork": {}, "list": {}, "resume": {}}}, "authMethods": [{"description": "Run `opencode auth login` in the terminal", "name": "Login with opencode", "id": "opencode-login"}], "agentInfo": {"name": "OpenCode", "version": "1.1.56"}}
+
+============================================================
+STEP 2: session/new
+============================================================
+
+>>> SENT: session/new (id=2)
+  [DEBUG] Payload: {"jsonrpc": "2.0", "id": 2, "method": "session/new", "params": {"cwd": "C:\\Users\\huy.pham\\Documents\\01-Working\\projects\\PMI-GPT", "mcpServers": []}}
+  [DEBUG] << {"jsonrpc": "2.0", "id": 2, "result": {"sessionId": "ses_3b41c14d6ffePk74TlpOC5yTZ2", "models": {"currentModelId": "opencode/big-pickle", "availableModels": [{"modelId": "github-copilot/gemini-3-pro-preview", "name": "GitHub Copilot/Gemini 3 Pro Preview"}, {"modelId": "github-copilot/claude-sonnet-4.5", "name": "GitHub Copilot/Claude Sonnet 4.5"}, {"modelId": "github-copilot/claude-sonnet-4.5/thinking", "name": "GitHub Copilot/Claude Sonnet 4.5 (thinking)"}, {"modelId": "github-copilot/claude-so
+  [DEBUG] << {"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": "ses_3b41c14d6ffePk74TlpOC5yTZ2", "update": {"sessionUpdate": "available_commands_update", "availableCommands": [{"name": "init", "description": "create/update AGENTS.md"}, {"name": "review", "description": "review changes [commit|branch|pr], defaults to uncommitted"}, {"name": "save", "description": "Summarize the current session progress and save it to the issue memory file. Creates the file if missing."}, {"name": "spawn",
+  (took 1.1s)
+  sessionId: ses_3b41c14d6ffePk74TlpOC5yTZ2
+  currentModel: opencode/big-pickle
+  currentMode: build
+  available models (137):
+    - github-copilot/gemini-3-pro-preview
+    - github-copilot/claude-sonnet-4.5
+    - github-copilot/claude-sonnet-4.5/thinking
+    - github-copilot/claude-sonnet-4
+    - github-copilot/claude-sonnet-4/thinking
+    - github-copilot/gpt-5.2-codex
+    - github-copilot/gpt-5.2-codex/low
+    - github-copilot/gpt-5.2-codex/medium
+    - github-copilot/gpt-5.2-codex/high
+    - github-copilot/gpt-5.2-codex/xhigh
+    - github-copilot/gpt-5.2
+    - github-copilot/gpt-5.2/low
+    - github-copilot/gpt-5.2/medium
+    - github-copilot/gpt-5.2/high
+    - github-copilot/gpt-5.2/xhigh
+    - github-copilot/gpt-5.1-codex-mini
+    - github-copilot/gpt-5.1-codex-mini/low
+    - github-copilot/gpt-5.1-codex-mini/medium
+    - github-copilot/gpt-5.1-codex-mini/high
+    - github-copilot/gpt-5.1-codex-max
+    - github-copilot/gpt-5.1-codex-max/low
+    - github-copilot/gpt-5.1-codex-max/medium
+    - github-copilot/gpt-5.1-codex-max/high
+    - github-copilot/gpt-5.1-codex-max/xhigh
+    - github-copilot/gpt-5.1-codex
+    - github-copilot/gpt-5.1-codex/low
+    - github-copilot/gpt-5.1-codex/medium
+    - github-copilot/gpt-5.1-codex/high
+    - github-copilot/gpt-5.1
+    - github-copilot/gpt-5.1/low
+    - github-copilot/gpt-5.1/medium
+    - github-copilot/gpt-5.1/high
+    - github-copilot/gpt-5-mini
+    - github-copilot/gpt-5-mini/low
+    - github-copilot/gpt-5-mini/medium
+    - github-copilot/gpt-5-mini/high
+    - github-copilot/gpt-5
+    - github-copilot/gpt-5/low
+    - github-copilot/gpt-5/medium
+    - github-copilot/gpt-5/high
+    - github-copilot/grok-code-fast-1
+    - github-copilot/gpt-4o
+    - github-copilot/gpt-4.1
+    - github-copilot/gemini-3-flash-preview
+    - github-copilot/gemini-2.5-pro
+    - github-copilot/claude-opus-41
+    - github-copilot/claude-opus-41/thinking
+    - github-copilot/claude-opus-4.6
+    - github-copilot/claude-opus-4.6/thinking
+    - github-copilot/claude-opus-4.5
+    - github-copilot/claude-opus-4.5/thinking
+    - github-copilot/claude-haiku-4.5
+    - github-copilot/claude-haiku-4.5/thinking
+    - github-copilot/GPT-5-MINI
+    - google/gemini-3-pro-preview
+    - google/gemini-3-pro-preview/low
+    - google/gemini-3-pro-preview/high
+    - google/gemini-flash-lite-latest
+    - google/gemini-flash-lite-latest/low
+    - google/gemini-flash-lite-latest/high
+    - google/gemini-flash-latest
+    - google/gemini-flash-latest/low
+    - google/gemini-flash-latest/high
+    - google/gemini-live-2.5-flash-preview-native-audio
+    - google/gemini-live-2.5-flash-preview-native-audio/high
+    - google/gemini-live-2.5-flash-preview-native-audio/max
+    - google/gemini-live-2.5-flash
+    - google/gemini-live-2.5-flash/high
+    - google/gemini-live-2.5-flash/max
+    - google/gemini-embedding-001
+    - google/gemini-3-flash-preview
+    - google/gemini-3-flash-preview/low
+    - google/gemini-3-flash-preview/high
+    - google/gemini-2.5-pro-preview-tts
+    - google/gemini-2.5-pro-preview-06-05
+    - google/gemini-2.5-pro-preview-06-05/high
+    - google/gemini-2.5-pro-preview-06-05/max
+    - google/gemini-2.5-pro-preview-05-06
+    - google/gemini-2.5-pro-preview-05-06/high
+    - google/gemini-2.5-pro-preview-05-06/max
+    - google/gemini-2.5-pro
+    - google/gemini-2.5-pro/high
+    - google/gemini-2.5-pro/max
+    - google/gemini-2.5-flash-preview-tts
+    - google/gemini-2.5-flash-preview-09-2025
+    - google/gemini-2.5-flash-preview-09-2025/high
+    - google/gemini-2.5-flash-preview-09-2025/max
+    - google/gemini-2.5-flash-preview-05-20
+    - google/gemini-2.5-flash-preview-05-20/high
+    - google/gemini-2.5-flash-preview-05-20/max
+    - google/gemini-2.5-flash-preview-04-17
+    - google/gemini-2.5-flash-preview-04-17/high
+    - google/gemini-2.5-flash-preview-04-17/max
+    - google/gemini-2.5-flash-lite-preview-09-2025
+    - google/gemini-2.5-flash-lite-preview-09-2025/high
+    - google/gemini-2.5-flash-lite-preview-09-2025/max
+    - google/gemini-2.5-flash-lite-preview-06-17
+    - google/gemini-2.5-flash-lite-preview-06-17/high
+    - google/gemini-2.5-flash-lite-preview-06-17/max
+    - google/gemini-2.5-flash-lite
+    - google/gemini-2.5-flash-lite/high
+    - google/gemini-2.5-flash-lite/max
+    - google/gemini-2.5-flash-image-preview
+    - google/gemini-2.5-flash-image-preview/high
+    - google/gemini-2.5-flash-image-preview/max
+    - google/gemini-2.5-flash-image
+    - google/gemini-2.5-flash-image/high
+    - google/gemini-2.5-flash-image/max
+    - google/gemini-2.5-flash
+    - google/gemini-2.5-flash/high
+    - google/gemini-2.5-flash/max
+    - google/gemini-2.0-flash-lite
+    - google/gemini-2.0-flash
+    - google/gemini-1.5-pro
+    - google/gemini-1.5-flash-8b
+    - google/gemini-1.5-flash
+    - lmstudio/qwen3-coder-next
+    - lmstudio/qwen/qwen3-coder-30b
+    - lmstudio/qwen/qwen3-4b-thinking-2507
+    - lmstudio/qwen/qwen3-30b-a3b-2507
+    - lmstudio/openai/gpt-oss-20b
+    - lmstudio/openai/gpt-oss-20b/low
+    - lmstudio/openai/gpt-oss-20b/medium
+    - lmstudio/openai/gpt-oss-20b/high
+    - lmstudio/glm-4.7-flash@q3_k_xl
+    - opencode/big-pickle
+    - opencode/big-pickle/low
+    - opencode/big-pickle/medium
+    - opencode/big-pickle/high
+    - opencode/gpt-5-nano
+    - opencode/gpt-5-nano/minimal
+    - opencode/gpt-5-nano/low
+    - opencode/gpt-5-nano/medium
+    - opencode/gpt-5-nano/high
+    - opencode/trinity-large-preview-free
+    - opencode/minimax-m2.1-free
+    - opencode/kimi-k2.5-free
+  available modes (4):
+    - build (build)
+    - plan (plan)
+    - research-leader (research-leader)
+    - instructions (instructions)
+  [DEBUG] Full session/new result: {"sessionId": "ses_3b41c14d6ffePk74TlpOC5yTZ2", "models": {"currentModelId": "opencode/big-pickle", "availableModels": [{"modelId": "github-copilot/gemini-3-pro-preview", "name": "GitHub Copilot/Gemini 3 Pro Preview"}, {"modelId": "github-copilot/claude-sonnet-4.5", "name": "GitHub Copilot/Claude Sonnet 4.5"}, {"modelId": "github-copilot/claude-sonnet-4.5/thinking", "name": "GitHub Copilot/Claude Sonnet 4.5 (thinking)"}, {"modelId": "github-copilot/claude-sonnet-4", "name": "GitHub Copilot/Claude Sonnet 4"}, {"modelId": "github-copilot/claude-sonnet-4/thinking", "name": "GitHub Copilot/Claude Sonnet 4 (thinking)"}, {"modelId": "github-copilot/gpt-5.2-codex", "name": "GitHub Copilot/GPT-5.2-Codex"}, {"modelId": "github-copilot/gpt-5.2-codex/low", "name": "GitHub Copilot/GPT-5.2-Codex (low)"}, {"modelId": "github-copilot/gpt-5.2-codex/medium", "name": "GitHub Copilot/GPT-5.2-Codex (medium)"}, {"modelId": "github-copilot/gpt-5.2-codex/high", "name": "GitHub Copilot/GPT-5.2-Codex (high)"}, {"modelId": "github-copilot/gpt-5.2-codex/xhigh", "name": "GitHub Copilot/GPT-5.2-Codex (xhigh)"}, {"modelId": "github-copilot/gpt-5.2", "name": "GitHub Copilot/GPT-5.2"}, {"modelId": "github-copilot/gpt-5.2/low", "name": "GitHub Copilot/GPT-5.2 (low)"}, {"modelId": "github-copilot/gpt-5.2/medium", "name": "GitHub Copilot/GPT-5.2 (medium)"}, {"modelId": "github-copilot/gpt-5.2/high", "name": "GitHub Copilot/GPT-5.2 (high)"}, {"modelId": "github-copilot/gpt-5.2/xhigh", "name": "GitHub Copilot/GPT-5.2 (xhigh)"}, {"modelId": "github-copilot/gpt-5.1-codex-mini", "name": "GitHub Copilot/GPT-5.1-Codex-mini"}, {"modelId": "github-copilot/gpt-5.1-codex-mini/low", "name": "GitHub Copilot/GPT-5.1-Codex-mini (low)"}, {"modelId": "github-copilot/gpt-5.1-codex-mini/medium", "name": "GitHub Copilot/GPT-5.1-Codex-mini (medium)"}, {"modelId": "github-copilot/gpt-5.1-codex-mini/high", "name": "GitHub Copilot/GPT-5.1-Codex-mini (high)"}, {"modelId": "github-copilot/gpt-5.1-codex-max", "name": "GitHub C
+
+============================================================
+STEP 5: session/prompt
+  Prompt: Say hello in one sentence.
+============================================================
+
+>>> SENT: session/prompt (id=3)
+  [DEBUG] Payload: {"jsonrpc": "2.0", "id": 3, "method": "session/prompt", "params": {"sessionId": "ses_3b41c14d6ffePk74TlpOC5yTZ2", "prompt": [{"type": "text", "text": "Say hello in one sentence."}]}}
+
+--- Response ---
+  [timeout after 60s, received 0 messages total]
+  (prompt took 60.0s)
+
+Done.
