@@ -2338,4 +2338,85 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
   // Note: Permission mode cycling settings (cyclablePermissionModes) are now workspace-level
   // and managed via WORKSPACE_SETTINGS_GET/UPDATE channels
 
+  // ============================================================
+  // Test Case Generation (RAG via LMStudio + ACP)
+  // ============================================================
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_GENERATE, async (_event, workspaceId: string, attackVector: string) => {
+    const { selectRelevantWSTGEntries, buildAugmentedPrompt } = await import('./lmstudio')
+    const { parseTestCasesFromResponse, toTestCases } = await import('../shared/testcase-parser')
+
+    ipcLog.info(`[TestCaseGen] Starting generation for: "${attackVector}" in workspace ${workspaceId}`)
+
+    // Step 1: RAG — use LMStudio to select 1 primary + 2 secondary WSTG entries
+    const selection = await selectRelevantWSTGEntries(attackVector)
+    ipcLog.info(`[TestCaseGen] Selected WSTG entries: primary=${selection.primary?.id ?? 'none'}, secondary=${selection.secondary.map(e => e.id).join(', ') || 'none'}`)
+
+    // Step 2: Build augmented prompt with full WSTG context
+    const augmentedPrompt = buildAugmentedPrompt(attackVector, selection)
+
+    // Step 3: Create ACP session and send prompt to OpenCode
+    const session = await sessionManager.createSession(workspaceId, {
+      profile: 'testcase',
+      hidden: true,
+    })
+
+    await sessionManager.sendMessage(session.id, augmentedPrompt)
+
+    // Step 4: Collect the full response from session messages
+    const fullSession = await sessionManager.getSession(session.id)
+    const assistantMessages = fullSession?.messages
+      .filter((m) => m.role === 'assistant')
+      .map((m) => m.content)
+      .join('\n') ?? ''
+
+    ipcLog.info(`[TestCaseGen] Received ${assistantMessages.length} chars from ACP`)
+
+    // Step 5: Parse markdown response into structured TestCase objects
+    const parsed = parseTestCasesFromResponse(assistantMessages)
+    const testCases = toTestCases(parsed, session.id, workspaceId)
+
+    ipcLog.info(`[TestCaseGen] Parsed ${testCases.length} test cases`)
+
+    // Step 6: Persist test cases to disk
+    const { saveTestCases } = await import('@craft-agent/shared/testcases/storage')
+    saveTestCases(testCases)
+
+    return testCases
+  })
+
+  // ============================================================
+  // Test Cases
+  // ============================================================
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_LIST, async () => {
+    const { listTestCases } = await import('@craft-agent/shared/testcases/storage')
+    return listTestCases()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_GET, async (_event, id: string) => {
+    const { getTestCase } = await import('@craft-agent/shared/testcases/storage')
+    return getTestCase(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_SAVE, async (_event, testCase: import('../shared/types').TestCase) => {
+    const { saveTestCase } = await import('@craft-agent/shared/testcases/storage')
+    saveTestCase(testCase)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_SAVE_BATCH, async (_event, testCases: import('../shared/types').TestCase[]) => {
+    const { saveTestCases } = await import('@craft-agent/shared/testcases/storage')
+    saveTestCases(testCases)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_DELETE, async (_event, id: string) => {
+    const { deleteTestCase } = await import('@craft-agent/shared/testcases/storage')
+    deleteTestCase(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_DELETE_ALL, async () => {
+    const { deleteAllTestCases } = await import('@craft-agent/shared/testcases/storage')
+    deleteAllTestCases()
+  })
+
 }

@@ -401,6 +401,135 @@ export interface CreateSessionOptions {
   labels?: string[]
   /** Whether the session should be flagged */
   isFlagged?: boolean
+  /** Agent profile for the session (e.g., 'testcase' for test case generation) */
+  profile?: AgentProfile
+}
+
+// ============================================
+// Test Case Types
+// ============================================
+// TestCase is a first-class entity, NOT derived from session messages.
+// Each test generation session (profile: 'testcase') produces multiple TestCase objects.
+// Messages provide traceability only — the UI renders from TestCase data directly.
+
+/**
+ * Generic reference (CAPEC, OWASP WSTG, CWE, etc.)
+ */
+export interface Reference {
+  /** Reference ID (e.g., "CAPEC-86", "WSTG-INPV-05", "CWE-79") */
+  id: string
+  /** Human-readable name */
+  name: string
+  /** Optional URL to the reference entry */
+  url?: string
+}
+
+/**
+ * Full TestCase entity — used for report view rendering.
+ * Stored as first-class objects linked to a generation session.
+ */
+export interface TestCase {
+  /** Unique test case identifier */
+  id: string
+  /** Workspace this test case belongs to */
+  workspaceId: string
+  /** The session (profile: 'testcase') that generated this test case */
+  generationSessionId: string
+
+  // Display basics
+  /** Test case title (shown on cards) */
+  name: string
+
+  // Target (simplified)
+  /** What this test targets (e.g., "Login form username parameter") */
+  targetComponent?: string
+
+  // Report fields
+  /** Detailed description (markdown) */
+  description?: string
+  /** Preconditions needed before running this test (markdown) */
+  preconditions?: string
+  /** Guidance for executing this test (markdown) */
+  guidance?: string
+  /** Expected behavior when properly secured (markdown) */
+  expectedBehavior?: string
+  /** Actual observed result (markdown, filled after execution) */
+  actualResult?: string
+
+  // References (generic list supporting CAPEC, WSTG, CWE, etc.)
+  /** List of references (CAPEC, OWASP WSTG, CWE, etc.) */
+  reference?: Reference[]
+
+  // Traceability
+  /** Message ID in the generation session that produced this test case */
+  sourceMessageId?: string
+  /** Turn ID for "open in chat at this point" navigation */
+  sourceTurnId?: string
+
+  // Timestamps
+  /** When this test case was created (ms timestamp) */
+  createdAt: number
+  /** When this test case was last updated (ms timestamp) */
+  updatedAt: number
+}
+
+/**
+ * Lightweight metadata for grid/card display — avoids loading full report bodies.
+ * Mirrors the SessionMeta pattern: testCaseMetaMapAtom holds Map<id, TestCaseMeta>.
+ */
+export interface TestCaseMeta {
+  id: string
+  workspaceId: string
+  generationSessionId: string
+  name: string
+  targetComponent?: string
+  /** For LIFO ordering in the grid */
+  createdAt: number
+  updatedAt: number
+  /** Reference IDs for badge display */
+  referenceIds?: string[]
+}
+
+/**
+ * Extract lightweight meta from a full TestCase (like extractSessionMeta)
+ */
+export const extractTestCaseMeta = (tc: TestCase): TestCaseMeta => ({
+  id: tc.id,
+  workspaceId: tc.workspaceId,
+  generationSessionId: tc.generationSessionId,
+  name: tc.name,
+  targetComponent: tc.targetComponent,
+  createdAt: tc.createdAt,
+  updatedAt: tc.updatedAt,
+  referenceIds: tc.reference?.map(r => r.id),
+})
+
+// ============================================
+// Test Cases Navigation State
+// ============================================
+
+/**
+ * Test case view mode — determines what's shown in MainContentPanel
+ */
+export type TestCaseViewMode = 'grid' | 'report' | 'chat'
+
+/**
+ * Test Cases navigation state - shows TestCasesPanel in navigator
+ */
+export interface TestCasesNavigationState {
+  navigator: 'testcases'
+  /** Selected generation session + optional test case detail */
+  details: {
+    type: 'testcase'
+    /** The generation session ID */
+    sessionId: string
+    /** Optional: specific test case within the session */
+    testCaseId?: string
+    /** Current view mode */
+    viewMode: TestCaseViewMode
+  } | null
+  /** Optional right sidebar panel state */
+  rightSidebar?: RightSidebarPanel
 }
 
 // Events sent from main to renderer
@@ -768,6 +897,17 @@ export const IPC_CHANNELS = {
   MENU_COPY: 'menu:copy',
   MENU_PASTE: 'menu:paste',
   MENU_SELECT_ALL: 'menu:selectAll',
+
+  // Test Case Generation (RAG via LMStudio + ACP)
+  TESTCASES_GENERATE: 'testcases:generate',
+
+  // Test Cases
+  TESTCASES_LIST: 'testcases:list',
+  TESTCASES_GET: 'testcases:get',
+  TESTCASES_SAVE: 'testcases:save',
+  TESTCASES_SAVE_BATCH: 'testcases:saveBatch',
+  TESTCASES_DELETE: 'testcases:delete',
+  TESTCASES_DELETE_ALL: 'testcases:deleteAll',
 } as const
 
 // Re-import types for ElectronAPI
@@ -1057,6 +1197,17 @@ export interface ElectronAPI {
   menuCopy(): Promise<void>
   menuPaste(): Promise<void>
   menuSelectAll(): Promise<void>
+
+  // Test Case Generation (RAG via LMStudio + ACP)
+  generateTestCases(workspaceId: string, attackVector: string): Promise<TestCase[]>
+
+  // Test Cases
+  listTestCases(): Promise<TestCase[]>
+  getTestCase(id: string): Promise<TestCase | null>
+  saveTestCase(testCase: TestCase): Promise<void>
+  saveTestCases(testCases: TestCase[]): Promise<void>
+  deleteTestCase(id: string): Promise<void>
+  deleteAllTestCases(): Promise<void>
 }
 
 /**
@@ -1216,6 +1367,7 @@ export type NavigationState =
   | SourcesNavigationState
   | SettingsNavigationState
   | SkillsNavigationState
+  | TestCasesNavigationState
 
 /**
  * Type guard to check if state is chats navigation
@@ -1246,6 +1398,13 @@ export const isSkillsNavigation = (
 ): state is SkillsNavigationState => state.navigator === 'skills'
 
 /**
+ * Type guard to check if state is testcases navigation
+ */
+export const isTestCasesNavigation = (
+  state: NavigationState
+): state is TestCasesNavigationState => state.navigator === 'testcases'
+
+/**
  * Default navigation state - allChats with no selection
  */
 export const DEFAULT_NAVIGATION_STATE: NavigationState = {
@@ -1272,6 +1431,15 @@ export const getNavigationStateKey = (state: NavigationState): string => {
   }
   if (state.navigator === 'settings') {
     return `settings:${state.subpage}`
+  }
+  if (state.navigator === 'testcases') {
+    if (state.details) {
+      if (state.details.testCaseId) {
+        return `testcases/session/${state.details.sessionId}/case/${state.details.testCaseId}`
+      }
+      return `testcases/session/${state.details.sessionId}`
+    }
+    return 'testcases'
   }
   // Chats
   const f = state.filter
@@ -1318,6 +1486,23 @@ export const parseNavigationStateKey = (key: string): NavigationState | null => 
     if (['app', 'appearance', 'input', 'workspace', 'permissions', 'labels', 'shortcuts', 'preferences'].includes(subpage)) {
       return { navigator: 'settings', subpage }
     }
+  }
+
+  // Handle testcases
+  if (key === 'testcases') return { navigator: 'testcases', details: null }
+  if (key.startsWith('testcases/session/')) {
+    const rest = key.slice(18) // after 'testcases/session/'
+    if (rest.includes('/case/')) {
+      const [sessionId, , testCaseId] = rest.split('/')
+      if (sessionId && testCaseId) {
+        return { navigator: 'testcases', details: { type: 'testcase', sessionId, testCaseId, viewMode: 'report' } }
+      }
+    }
+    const sessionId = rest.split('/')[0]
+    if (sessionId) {
+      return { navigator: 'testcases', details: { type: 'testcase', sessionId, viewMode: 'grid' } }
+    }
+    return { navigator: 'testcases', details: null }
   }
 
   // Handle chats - parse filter and optional session

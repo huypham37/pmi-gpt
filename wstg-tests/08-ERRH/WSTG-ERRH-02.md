@@ -1,0 +1,8 @@
+# Testing for Stack Traces
+
+---
+id: WSTG-ERRH-02
+tag: TA
+---
+
+This content has been merged into: [Testing for Improper Error Handling](01-Testing_For_Improper_Error_Handling.md).

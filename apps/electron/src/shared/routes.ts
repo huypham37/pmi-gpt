@@ -150,6 +150,18 @@ export const routes = {
       return `skills/skill/${skillSlug}` as const
     },
 
+    /** Test cases view (testcases navigator) */
+    testcases: (params?: { generationSessionId?: string; testCaseId?: string }) => {
+      const { generationSessionId, testCaseId } = params ?? {}
+      if (generationSessionId && testCaseId) {
+        return `testcases/session/${generationSessionId}/case/${testCaseId}` as const
+      }
+      if (generationSessionId) {
+        return `testcases/session/${generationSessionId}` as const
+      }
+      return 'testcases' as const
+    },
+
     /** Settings view (settings navigator) */
     settings: (subpage?: 'app' | 'appearance' | 'input' | 'workspace' | 'permissions' | 'labels' | 'shortcuts' | 'preferences') =>
       subpage && subpage !== 'app'

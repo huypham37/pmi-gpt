@@ -10,7 +10,7 @@
 
 import { atom } from 'jotai'
 import { atomFamily } from 'jotai-family'
-import type { Session, Message } from '../../shared/types'
+import type { Session, Message, AgentProfile } from '../../shared/types'
 
 /**
  * Session metadata for list display (lightweight, no messages)
@@ -68,6 +68,8 @@ export interface SessionMeta {
   messageCount?: number
   /** When true, session is hidden from session list (e.g., mini edit sessions) */
   hidden?: boolean
+  /** Agent profile for this session */
+  profile?: AgentProfile
 }
 
 /**
@@ -122,6 +124,8 @@ export function extractSessionMeta(session: Session): SessionMeta {
     tokenUsage: session.tokenUsage,
     // Hidden sessions (e.g., mini edit sessions in EditPopover)
     hidden: session.hidden,
+    // Agent profile (chat, agent, testcase)
+    profile: session.profile,
   }
 }
 
