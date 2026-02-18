@@ -16,7 +16,6 @@ import { getSessionAttachmentsPath, validateSessionId } from '@craft-agent/share
 import { loadWorkspaceSources, getSourcesBySlugs, type LoadedSource } from '@craft-agent/shared/sources'
 import { isValidThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
-import { MarkItDown } from 'markitdown-js'
 import { extractWithDocling, DOCLING_EXTS, IMAGE_EXTS } from './lib/docling-extract'
 
 /**
@@ -689,27 +688,19 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
         ipcLog.info('Thumbnail generation failed (using fallback):', thumbError instanceof Error ? thumbError.message : thumbError)
       }
 
-      // 3. Convert Office files to markdown (for sending to Claude)
-      // This is required for Office files - Claude can't read raw Office binary
+      // 3. Convert PDFs and Office files to markdown via Docling (for sending to Claude)
       let markdownPath: string | undefined
-      if (attachment.type === 'office') {
-        const mdFileName = `${id}_${safeName}.md`
-        const mdPath = join(attachmentsDir, mdFileName)
+      if (attachment.type === 'pdf' || attachment.type === 'office') {
+        const mdPath = join(attachmentsDir, `${id}_${safeName}.md`)
         try {
-          const markitdown = new MarkItDown()
-          const result = await markitdown.convert(storedPath)
-          if (!result || !result.textContent) {
-            throw new Error('Conversion returned empty result')
-          }
-          await writeFile(mdPath, result.textContent, 'utf-8')
+          const text = await extractWithDocling(storedPath)
+          await writeFile(mdPath, text, 'utf-8')
           markdownPath = mdPath
           filesToCleanup.push(mdPath)
-          ipcLog.info(`Converted Office file to markdown: ${mdPath}`)
+          ipcLog.info(`Extracted markdown from ${attachment.type}: ${mdPath}`)
         } catch (convertError) {
-          // Conversion failed - throw so user knows the file can't be processed
-          // Claude can't read raw Office binary, so a failed conversion = unusable file
           const errorMsg = convertError instanceof Error ? convertError.message : String(convertError)
-          ipcLog.error('Office to markdown conversion failed:', errorMsg)
+          ipcLog.error('Docling extraction failed:', errorMsg)
           throw new Error(`Failed to convert "${attachment.name}" to readable format: ${errorMsg}`)
         }
       }

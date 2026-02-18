@@ -16,7 +16,7 @@ export async function extractWithDocling(filePath: string): Promise<string> {
   await mkdir(outDir)
 
   return new Promise((resolve, reject) => {
-    const proc = spawn('docling', ['--to', 'md', '--output', outDir, filePath])
+    const proc = spawn('docling', ['--to', 'md', '--image-export-mode', 'placeholder', '--output', outDir, filePath])
 
     let stderr = ''
     proc.stderr.on('data', d => { stderr += d.toString() })

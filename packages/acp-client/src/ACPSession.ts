@@ -104,17 +104,13 @@ export class ACPSession {
       prompt: content.map(contentBlockToJSON),
     };
 
-    console.log("[ACP DEBUG] Sending session/prompt request...");
-
     this.client
       .sendRequest("session/prompt", promptParams)
       .then((result) => {
         const reason = (getStr(result, "stopReason") as StopReason | undefined) ?? "end_turn";
         this.lastStopReason = reason;
-        console.log(`[ACP DEBUG] session/prompt completed, stopReason=${reason}`);
       })
       .catch((error: unknown) => {
-        console.log(`[ACP DEBUG] session/prompt error: ${error}`);
         if (error instanceof Error && "code" in error && (error as { code: string }).code === "cancelled") {
           this.lastStopReason = "cancelled";
         }
@@ -219,29 +215,14 @@ export class ACPSession {
   // -- Notification handling --
 
   private handleNotification(method: string, params: JSONValue | undefined): void {
-    if (method !== "session/update") {
-      console.log(`[ACP DEBUG] Ignoring non-update notification: ${method}`);
-      return;
-    }
+    if (method !== "session/update") return;
     const sessionId = getStr(params, "sessionId");
-    if (!sessionId) {
-      console.log("[ACP DEBUG] session/update missing sessionId");
-      return;
-    }
-    if (sessionId !== this.id) return;
+    if (!sessionId || sessionId !== this.id) return;
 
     const update = get(params, "update");
-    if (!update) {
-      console.log("[ACP DEBUG] session/update missing 'update' field");
-      return;
-    }
+    if (!update) return;
     const updateType = getStr(update, "sessionUpdate");
-    if (!updateType) {
-      console.log("[ACP DEBUG] session/update missing 'sessionUpdate' type");
-      return;
-    }
-
-    console.log(`[ACP DEBUG] Received update: ${updateType}`);
+    if (!updateType) return;
 
     switch (updateType) {
       case "agent_message_chunk": {
@@ -258,9 +239,6 @@ export class ACPSession {
         break;
       case "tool_call": {
         const tool = new ToolCall(update);
-        console.log(
-          `[ACP DEBUG] Tool call received: id=${tool.id} title="${tool.title}" kind=${tool.kind} status=${tool.status}`,
-        );
         this.toolCalls.push(tool);
         this.enqueue({ type: "toolCall", toolCall: tool });
         break;
@@ -270,13 +248,8 @@ export class ACPSession {
         if (toolId) {
           const existing = this.toolCalls.find((tc) => tc.id === toolId);
           if (existing) {
-            console.log(
-              `[ACP DEBUG] Tool call update: id=${toolId} title="${existing.title}" status=${getStr(update, "status") ?? "unchanged"}`,
-            );
             existing.applyUpdate(update);
             this.enqueue({ type: "toolCall", toolCall: existing });
-          } else {
-            console.log(`[ACP DEBUG] Tool call update for unknown id: ${toolId}`);
           }
         }
         break;
@@ -284,7 +257,6 @@ export class ACPSession {
       case "plan": {
         const entries = getArr(update, "entries");
         if (entries) {
-          console.log(`[ACP DEBUG] Plan received with ${entries.length} entries`);
           const plan: PlanEntry[] = entries.map(parsePlanEntry);
           this.enqueue({ type: "plan", entries: plan });
         }
@@ -293,14 +265,12 @@ export class ACPSession {
       case "config_options_update": {
         const options = getArr(update, "configOptions");
         if (options) {
-          console.log(`[ACP DEBUG] Config update with ${options.length} options`);
           this.configOptions = options.map(parseConfigOption);
           this.enqueue({ type: "configUpdate", configOptions: this.configOptions });
         }
         break;
       }
       default:
-        console.log(`[ACP DEBUG] Unknown update type: ${updateType}`);
         break;
     }
   }
@@ -313,10 +283,6 @@ export class ACPSession {
 
     const options: PermissionOption[] = (getArr(params, "options") ?? []).map(parsePermissionOption);
     const toolCallInfo = get(params, "toolCall");
-
-    console.log(
-      `[ACP DEBUG] Permission request: requestId=${requestId} toolCallId=${getStr(toolCallInfo, "toolCallId") ?? "nil"} options=${JSON.stringify(options.map((o) => o.name))}`,
-    );
 
     const request = new PermissionRequest({
       requestId,

@@ -302,12 +302,8 @@ export class ACPClient {
       const id = msg["id"] as number;
       const method = msg["method"] as string;
       const params = (msg["params"] ?? null) as JSONValue;
-      console.log(`[ACP-DIAG] Incoming request from server: method=${method} id=${id}`);
       if (this.incomingRequestHandler) {
-        console.log(`[ACP-DIAG] Dispatching to incomingRequestHandler`);
         this.incomingRequestHandler(id, params);
-      } else {
-        console.log(`[ACP-DIAG] WARNING: No incomingRequestHandler set! Request method=${method} id=${id} will go unanswered. Server will hang waiting for response.`);
       }
       return;
     }
@@ -320,14 +316,10 @@ export class ACPClient {
         if (pending) {
           this.pendingRequests.delete(id);
           if (response.error) {
-            console.log(`[ACP-DIAG] Response error for id=${id}: ${response.error.message}`);
             pending.reject(this.mapRPCError(response.error));
           } else {
-            console.log(`[ACP-DIAG] Response OK for id=${id}`);
             pending.resolve((response.result ?? null) as JSONValue);
           }
-        } else {
-          console.log(`[ACP-DIAG] WARNING: Received response for id=${id} but no pending request found`);
         }
         return;
       }
@@ -336,7 +328,6 @@ export class ACPClient {
     if (msg["method"] !== undefined && msg["id"] === undefined) {
       const method = msg["method"] as string;
       const params = (msg["params"] ?? undefined) as JSONValue | undefined;
-      console.log(`[ACP-DIAG] Notification from server: method=${method}`);
       this.notificationHandler?.(method, params);
     }
   }
