@@ -21,6 +21,7 @@ files:
   - dist/assets/tool-icons/**/*
   - dist/assets/themes/**/*
   - dist/assets/permissions/**/*
+  - dist/assets/prompts/**/*
   - dist/assets/config-defaults.json
   # Include SDK for subprocess execution
   - node_modules/@anthropic-ai/claude-agent-sdk/**/*

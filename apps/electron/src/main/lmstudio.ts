@@ -10,36 +10,16 @@ import { LMStudioClient, Chat } from '@lmstudio/sdk'
 import { WSTG_ENTRIES, type WSTGEntry } from './wstg-data'
 import { sessionLog } from './logger'
 import { parseSelectedEntries } from './wstg-prompt'
+import { loadPrompt, renderTemplate } from './prompt-loader'
 
 export { buildAugmentedPrompt, parseSelectedEntries, type WSTGSelection } from './wstg-prompt'
-
-const SELECTION_SYSTEM_PROMPT = `You are a security testing assistant. Given a list of OWASP WSTG (Web Security Testing Guide) entries and an attack vector description, select the most relevant WSTG entries for generating test cases.
-
-STRICT REQUIREMENTS:
-1. Select exactly 1 PRIMARY entry — the single best match for the attack vector
-2. Select exactly 2 SECONDARY entries — related entries that provide additional context
-
-RESPONSE FORMAT (strict JSON, no exceptions):
-{"primary": "WSTG-XXXX-XX", "secondary": ["WSTG-XXXX-XX", "WSTG-XXXX-XX"]}
-
-RULES:
-- primary: MUST be exactly 1 WSTG ID (the best match)
-- secondary: MUST be exactly 2 WSTG IDs (related but distinct from primary)
-- All 3 IDs MUST be different
-- Return ONLY the JSON object — no explanation, no markdown, no commentary`
 
 function buildWSTGListPrompt(attackVector: string): string {
   const entrySummaries = WSTG_ENTRIES.map(
     (e) => `- ${e.id}: ${e.name} — ${e.description}`,
   ).join('\n')
 
-  return `Attack vector: "${attackVector}"
-
-Available WSTG entries:
-${entrySummaries}
-
-Select 1 PRIMARY entry (best match) and 2 SECONDARY entries (related context).
-Return JSON: {"primary": "WSTG-...", "secondary": ["WSTG-...", "WSTG-..."]}`
+  return renderTemplate(loadPrompt('wstg-selection-user.md'), { attackVector, entrySummaries })
 }
 
 /**
@@ -62,7 +42,7 @@ export async function selectRelevantWSTGEntries(
       : await client.llm.model()
 
     const chat = Chat.from([
-      { role: 'system', content: SELECTION_SYSTEM_PROMPT },
+      { role: 'system', content: loadPrompt('wstg-selection-system.md').trim() },
       { role: 'user', content: buildWSTGListPrompt(attackVector) },
     ])
 
