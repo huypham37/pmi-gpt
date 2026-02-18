@@ -37,7 +37,7 @@ export function buildAugmentedPrompt(
   let secondaryContext = ''
   if (secondary.length > 0) {
     const secondarySummaries = secondary
-      .map((e) => `- **${e.id}**: ${e.name} — ${e.description}`)
+      .map((e) => `- **${e.id}**: ${e.name} — ${e.description} (${e.url})`)
       .join('\n')
     secondaryContext = `\n\n### Secondary WSTG References (for additional context)\n${secondarySummaries}`
   }
