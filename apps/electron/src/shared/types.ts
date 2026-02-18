@@ -519,8 +519,8 @@ export interface ContextDocument {
   id: string
   /** Original filename */
   name: string
-  /** File type (pdf, docx) */
-  type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'html' | 'image'
+  /** File type (pdf, docx, md, txt, etc.) */
+  type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'html' | 'image' | 'md' | 'txt'
   /** File size in bytes */
   size: number
   /** Path to extracted markdown file on disk */

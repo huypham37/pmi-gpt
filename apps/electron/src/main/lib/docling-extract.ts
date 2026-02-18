@@ -6,6 +6,8 @@ import { randomUUID } from 'crypto'
 
 export const DOCLING_EXTS = ['pdf', 'docx', 'pptx', 'xlsx', 'html', 'png', 'jpg', 'jpeg', 'webp']
 export const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp']
+export const PLAIN_TEXT_EXTS = ['md', 'txt']
+export const ALL_CONTEXT_EXTS = [...DOCLING_EXTS, ...PLAIN_TEXT_EXTS]
 
 export function getOutputMdPath(outDir: string, filePath: string): string {
   return join(outDir, basename(filePath).replace(/\.[^.]+$/, '.md'))

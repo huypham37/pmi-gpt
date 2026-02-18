@@ -85,7 +85,7 @@ function ProjectContextSection() {
     try {
       for (const filePath of paths) {
         const ext = filePath.split('.').pop()?.toLowerCase();
-        if (ext !== 'pdf' && ext !== 'docx') continue;
+        if (ext !== 'pdf' && ext !== 'docx' && ext !== 'pptx' && ext !== 'xlsx' && ext !== 'html' && ext !== 'png' && ext !== 'jpg' && ext !== 'jpeg' && ext !== 'webp' && ext !== 'md' && ext !== 'txt') continue;
         const updated = await window.electronAPI.addProjectContextDocument(
           activeWorkspaceId,
           filePath,
@@ -196,7 +196,7 @@ function ProjectContextSection() {
                     className="w-full py-2 rounded-md border border-dashed border-border text-[11px] text-muted-foreground/60 hover:text-muted-foreground hover:border-muted-foreground/40 transition-colors text-center"
                   >
                     <FileUp className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
-                    Upload PDF / DOCX
+                    Upload PDF, DOCX, MD...
                   </button>
                 ) : (
                   <div className="space-y-1">

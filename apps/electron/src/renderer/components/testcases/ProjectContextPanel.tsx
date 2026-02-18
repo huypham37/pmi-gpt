@@ -56,7 +56,7 @@ export const ProjectContextPanel = memo(function ProjectContextPanel({
     }
   }, [activeWorkspaceId, description, isDirty])
 
-  const SUPPORTED_EXTS = ['pdf', 'docx', 'pptx', 'xlsx', 'html', 'png', 'jpg', 'jpeg', 'webp']
+  const SUPPORTED_EXTS = ['pdf', 'docx', 'pptx', 'xlsx', 'html', 'png', 'jpg', 'jpeg', 'webp', 'md', 'txt']
 
   const handleAddDocument = useCallback(async () => {
     if (!activeWorkspaceId) return
@@ -171,7 +171,7 @@ export const ProjectContextPanel = memo(function ProjectContextPanel({
 
           {context?.documents.length === 0 ? (
             <div className="text-xs text-muted-foreground/70 p-3 rounded-lg border border-dashed border-border text-center">
-              No documents added yet. Upload PDF, DOCX, PPTX, XLSX, HTML, or images to provide additional context.
+              No documents added yet. Upload PDF, DOCX, PPTX, XLSX, HTML, images, or Markdown/Text files to provide additional context.
             </div>
           ) : (
             <div className="space-y-2">

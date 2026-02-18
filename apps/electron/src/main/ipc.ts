@@ -16,7 +16,7 @@ import { getSessionAttachmentsPath, validateSessionId } from '@craft-agent/share
 import { loadWorkspaceSources, getSourcesBySlugs, type LoadedSource } from '@craft-agent/shared/sources'
 import { isValidThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
-import { extractWithDocling, DOCLING_EXTS, IMAGE_EXTS } from './lib/docling-extract'
+import { extractWithDocling, DOCLING_EXTS, IMAGE_EXTS, PLAIN_TEXT_EXTS, ALL_CONTEXT_EXTS } from './lib/docling-extract'
 
 /**
  * Sanitizes a filename to prevent path traversal and filesystem issues.
@@ -2465,8 +2465,8 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
   ipcMain.handle(IPC_CHANNELS.CONTEXT_ADD_DOCUMENT, async (_event, workspaceId: string, filePath: string) => {
     const workspace = getWorkspaceOrThrow(workspaceId)
     const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
-    if (!DOCLING_EXTS.includes(ext)) {
-      throw new Error(`Unsupported file type: .${ext}. Supported: ${DOCLING_EXTS.join(', ')}`)
+    if (!ALL_CONTEXT_EXTS.includes(ext)) {
+      throw new Error(`Unsupported file type: .${ext}. Supported: ${ALL_CONTEXT_EXTS.join(', ')}`)
     }
 
     // Read original file
@@ -2481,7 +2481,13 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     const storedPath = join(docsDir, storedName)
     await writeFile(storedPath, fileBuffer)
 
-    const extractedText = await extractWithDocling(storedPath)
+    // Extract text: plain text files are read directly; others go through Docling
+    let extractedText: string
+    if (PLAIN_TEXT_EXTS.includes(ext)) {
+      extractedText = await readFile(storedPath, 'utf-8')
+    } else {
+      extractedText = await extractWithDocling(storedPath)
+    }
     const mdPath = join(docsDir, `${docId}.md`)
     await writeFile(mdPath, extractedText, 'utf-8')
 
@@ -2511,8 +2517,9 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
       const docsDir = join(workspace.rootPath, 'context', 'docs')
       // Delete original binary
       try {
+        // Delete original binary (stored as `${documentId}_<filename>`)
         const files = await readdir(docsDir)
-        const match = files.find(f => f.startsWith(documentId) && !f.endsWith('.md'))
+        const match = files.find(f => f.startsWith(`${documentId}_`))
         if (match) await unlink(join(docsDir, match))
       } catch {
         // File may already be gone
