@@ -14,6 +14,13 @@
 import { homedir } from 'os';
 import { join } from 'path';
 
+function defaultConfigDir(): string {
+  if (process.platform === 'win32') {
+    const appData = process.env.LOCALAPPDATA || process.env.APPDATA || homedir();
+    return join(appData, 'craft-agent');
+  }
+  return join(homedir(), '.craft-agent');
+}
+
 // Allow override via environment variable for multi-instance dev
-// Falls back to default ~/.craft-agent/ for production and non-numbered dev folders
-export const CONFIG_DIR = process.env.CRAFT_CONFIG_DIR || join(homedir(), '.craft-agent');
+export const CONFIG_DIR = process.env.CRAFT_CONFIG_DIR || defaultConfigDir();

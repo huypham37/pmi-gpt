@@ -1468,28 +1468,22 @@ export class SessionManager {
       const end = perf.start('acpSession.create', { sessionId: managed.id })
       const config = loadStoredConfig()
       // Create a new ACP session (the server owns tools/prompts/behavior)
-      sessionLog.info(`[ACP-DIAG] Creating new ACP session for ${managed.id}...`)
       managed.acpSession = await this.acpClient.newSession()
-      sessionLog.info(`[ACP-DIAG] Created ACP session for ${managed.id}: acpSessionId=${managed.acpSession.id}`)
 
       // Set model if session has a specific model override
       const resolvedModel = managed.model || config?.model || DEFAULT_MODEL
-      sessionLog.info(`[ACP-DIAG] Setting model to: ${resolvedModel}`)
       try {
         await managed.acpSession.setModel(resolvedModel)
-        sessionLog.info(`[ACP-DIAG] Model set successfully: ${resolvedModel}`)
       } catch (e) {
-        sessionLog.warn(`[ACP-DIAG] Failed to set model ${resolvedModel}:`, e)
+        sessionLog.warn(`Failed to set model ${resolvedModel}:`, e)
       }
 
       // Set mode from session profile (falls back to stored config, then 'testcase-generator')
       const resolvedMode = (managed.profile ? profileToMode(managed.profile) : null) || getMode() || 'testcase-generator'
-      sessionLog.info(`[ACP-DIAG] Setting mode to: ${resolvedMode}`)
       try {
         await managed.acpSession.setMode(resolvedMode)
-        sessionLog.info(`[ACP-DIAG] Mode set successfully: ${resolvedMode}`)
       } catch (e) {
-        sessionLog.warn(`[ACP-DIAG] Failed to set mode ${resolvedMode}:`, e)
+        sessionLog.warn(`Failed to set mode ${resolvedMode}:`, e)
       }
 
       end()
@@ -2251,21 +2245,27 @@ export class SessionManager {
     sendSpan.mark('acpSession.ready')
 
     try {
-      sessionLog.info(`[ACP-DIAG] Starting chat for session: ${sessionId}`)
-      sessionLog.info(`[ACP-DIAG] Message: "${message.substring(0, 100)}"`)
-      sessionLog.info(`[ACP-DIAG] ACP session ID: ${acpSession.id}`)
-
       sendSpan.mark('chat.starting')
-      sessionLog.info('[ACP-DIAG] Calling acpSession.prompt()...')
-      const updateStream = acpSession.prompt(message)
-      sessionLog.info('[ACP-DIAG] prompt() returned, entering for-await loop...')
 
-      let updateCount = 0
+      // Build content blocks: text message + attachment content
+      const contentBlocks: import('@craft-agent/acp-client').ContentBlock[] = [{ type: 'text', text: message }]
+      for (const att of storedAttachments ?? []) {
+        if (att.type === 'image') {
+          // Use resizedBase64 if available (already in memory), otherwise read from disk
+          const base64 = att.resizedBase64 ?? (await readFile(att.storedPath).catch(() => null))?.toString('base64')
+          if (base64) contentBlocks.push({ type: 'image', data: base64, mimeType: att.mimeType })
+        } else if (att.markdownPath) {
+          // PDF and Office: send extracted markdown
+          const md = await readFile(att.markdownPath, 'utf-8').catch(() => null)
+          if (md) contentBlocks.push({ type: 'resource', resource: { uri: `file://${att.storedPath}`, mimeType: 'text/markdown', text: md } })
+        } else if (att.type === 'text' || att.type === 'unknown') {
+          const text = await readFile(att.storedPath, 'utf-8').catch(() => null)
+          if (text) contentBlocks.push({ type: 'resource', resource: { uri: `file://${att.storedPath}`, text } })
+        }
+      }
+      const updateStream = acpSession.prompt(contentBlocks.length > 1 ? contentBlocks : message)
+
       for await (const update of updateStream) {
-        updateCount++
-        // Log ALL updates for debugging
-        sessionLog.info(`[ACP-DIAG] Update #${updateCount}: type=${update.type}${update.type === 'text' ? `, text="${(update as any).text?.substring(0, 50)}"` : ''}`)
-
         // Process the ACP update
         this.processACPUpdate(managed, update)
 
@@ -2279,8 +2279,6 @@ export class SessionManager {
       // Finalize any streaming text into a complete message
       this.finalizeStreamingText(managed)
 
-      // Stream completed - handle completion
-      sessionLog.info(`[ACP-DIAG] ACP prompt stream completed. Total updates received: ${updateCount}`)
       sendSpan.mark('chat.complete')
       sendSpan.end()
       this.onProcessingStopped(sessionId, 'complete')
@@ -2675,7 +2673,6 @@ To view this task's output:
       if (managed.acpSession) {
         const mode = profileToMode(profile)
         await managed.acpSession.setMode(mode)
-        sessionLog.info(`[ACP-DIAG] Profile changed to '${profile}', mode set to '${mode}'`)
       }
 
       this.sendEvent({

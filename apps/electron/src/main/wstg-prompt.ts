@@ -37,7 +37,7 @@ export function buildAugmentedPrompt(
   let secondaryContext = ''
   if (secondary.length > 0) {
     const secondarySummaries = secondary
-      .map((e) => `- **${e.id}**: ${e.name} — ${e.description}`)
+      .map((e) => `- **${e.id}**: ${e.name} — ${e.description} (${e.url})`)
       .join('\n')
     secondaryContext = `\n\n### Secondary WSTG References (for additional context)\n${secondarySummaries}`
   }
@@ -51,7 +51,8 @@ export function buildAugmentedPrompt(
     }
     if (projectContext.documents.length > 0) {
       const docSummaries = projectContext.documents
-        .map(d => `#### ${d.name}\n${d.extractedText.slice(0, 2000)}`)
+        // TODO: add error if total document size exceeds Claude context window limit
+        .map(d => `#### ${d.name}\n${d.extractedText}`)
         .join('\n\n')
       parts.push(`**Uploaded Documents:**\n${docSummaries}`)
     }
