@@ -12,16 +12,13 @@ interface TestCaseGridProps {
   testCaseIds: string[];
   /** Currently selected test case ID */
   selectedTestCaseId?: string;
-  /** Called when a test case card is clicked */
-  onSelectTestCase?: (testCaseId: string) => void;
-  /** Called when the expand/report button is clicked on a card */
+  /** Called when a test case card is expanded (whole card click) */
   onExpandTestCase?: (testCaseId: string) => void;
 }
 
 export const TestCaseGrid = memo(function TestCaseGrid({
   testCaseIds,
   selectedTestCaseId,
-  onSelectTestCase,
   onExpandTestCase,
 }: TestCaseGridProps) {
   const metaMap = useAtomValue(testCaseMetaMapAtom);
@@ -38,13 +35,6 @@ export const TestCaseGrid = memo(function TestCaseGrid({
     }
     return result;
   }, [testCaseIds, metaMap]);
-
-  const handleSelect = useCallback(
-    (testCaseId: string) => {
-      onSelectTestCase?.(testCaseId);
-    },
-    [onSelectTestCase]
-  );
 
   const handleExpand = useCallback(
     (testCaseId: string) => {
@@ -75,7 +65,6 @@ export const TestCaseGrid = memo(function TestCaseGrid({
             key={testCase.id}
             testCase={testCase}
             isSelected={testCase.id === selectedTestCaseId}
-            onClick={() => handleSelect(testCase.id)}
             onExpand={() => handleExpand(testCase.id)}
             onDelete={() => handleDelete(testCase.id)}
           />

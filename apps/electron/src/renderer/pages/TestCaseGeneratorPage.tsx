@@ -50,10 +50,6 @@ export function TestCaseGeneratorPage({
     loadAllTestCases();
   }, [loadAllTestCases]);
 
-  const handleSelectTestCase = useCallback((testCaseId: string) => {
-    setSelectedTestCaseId(testCaseId);
-  }, []);
-
   const handleExpandTestCase = useCallback((testCaseId: string) => {
     setSelectedTestCaseId(testCaseId);
     setViewMode('report');
@@ -153,7 +149,6 @@ export function TestCaseGeneratorPage({
             <TestCaseGrid
               testCaseIds={testCaseIds}
               selectedTestCaseId={selectedTestCaseId}
-              onSelectTestCase={handleSelectTestCase}
               onExpandTestCase={handleExpandTestCase}
             />
           </div>
