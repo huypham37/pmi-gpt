@@ -17,6 +17,7 @@ import { loadWorkspaceSources, getSourcesBySlugs, type LoadedSource } from '@cra
 import { isValidThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { MarkItDown } from 'markitdown-js'
+import { extractWithDocling, DOCLING_EXTS, IMAGE_EXTS } from './lib/docling-extract'
 
 /**
  * Sanitizes a filename to prevent path traversal and filesystem issues.
@@ -2350,13 +2351,22 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
 
     // Step 0: Load project context (graceful fallback if empty/missing)
     const projectContext = await getOrCreateContext(workspaceId)
+    const contextDocuments = await Promise.all(
+      projectContext.documents.map(async d => ({
+        name: d.name,
+        extractedText: await readFile(d.extractedTextPath, 'utf-8').catch(() => ''),
+      }))
+    )
 
     // Step 1: RAG — use LMStudio to select 1 primary + 2 secondary WSTG entries
     const selection = await selectRelevantWSTGEntries(attackVector)
     ipcLog.info(`[TestCaseGen] Selected WSTG entries: primary=${selection.primary?.id ?? 'none'}, secondary=${selection.secondary.map(e => e.id).join(', ') || 'none'}`)
 
     // Step 2: Build augmented prompt with full WSTG context + project context
-    const augmentedPrompt = buildAugmentedPrompt(attackVector, selection, projectContext)
+    const augmentedPrompt = buildAugmentedPrompt(attackVector, selection, {
+      description: projectContext.description,
+      documents: contextDocuments,
+    })
 
     // Step 3: Create ACP session and send prompt to OpenCode
     const session = await sessionManager.createSession(workspaceId, {
@@ -2463,9 +2473,9 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
 
   ipcMain.handle(IPC_CHANNELS.CONTEXT_ADD_DOCUMENT, async (_event, workspaceId: string, filePath: string) => {
     const workspace = getWorkspaceOrThrow(workspaceId)
-    const ext = filePath.split('.').pop()?.toLowerCase()
-    if (ext !== 'pdf' && ext !== 'docx') {
-      throw new Error('Only PDF and DOCX files are supported')
+    const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+    if (!DOCLING_EXTS.includes(ext)) {
+      throw new Error(`Unsupported file type: .${ext}. Supported: ${DOCLING_EXTS.join(', ')}`)
     }
 
     // Read original file
@@ -2480,23 +2490,16 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     const storedPath = join(docsDir, storedName)
     await writeFile(storedPath, fileBuffer)
 
-    // Extract text using MarkItDown (already available in this file)
-    let extractedText = ''
-    try {
-      const markitdown = new MarkItDown()
-      const result = await markitdown.convert(storedPath)
-      extractedText = result?.textContent ?? ''
-    } catch (err) {
-      ipcLog.error(`Failed to extract text from ${fileName}:`, err)
-      extractedText = `[Text extraction failed for ${fileName}]`
-    }
+    const extractedText = await extractWithDocling(storedPath)
+    const mdPath = join(docsDir, `${docId}.md`)
+    await writeFile(mdPath, extractedText, 'utf-8')
 
     const doc: import('../shared/types').ContextDocument = {
       id: docId,
       name: fileName,
-      type: ext as 'pdf' | 'docx',
+      type: IMAGE_EXTS.includes(ext) ? 'image' : (ext as import('../shared/types').ContextDocument['type']),
       size: fileBuffer.length,
-      extractedText,
+      extractedTextPath: mdPath,
       addedAt: Date.now(),
     }
 
@@ -2514,17 +2517,17 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
 
     if (docIndex !== -1) {
       const doc = context.documents[docIndex]
-      // Try to delete the stored file
       const docsDir = join(workspace.rootPath, 'context', 'docs')
+      // Delete original binary
       try {
         const files = await readdir(docsDir)
-        const match = files.find(f => f.startsWith(documentId))
-        if (match) {
-          await unlink(join(docsDir, match))
-        }
+        const match = files.find(f => f.startsWith(documentId) && !f.endsWith('.md'))
+        if (match) await unlink(join(docsDir, match))
       } catch {
         // File may already be gone
       }
+      // Delete extracted markdown
+      await unlink(doc.extractedTextPath).catch(() => {})
       context.documents.splice(docIndex, 1)
       await saveContext(workspaceId, context)
       ipcLog.info(`[Context] Removed document: ${doc.name} (${documentId})`)

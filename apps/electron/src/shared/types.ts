@@ -520,11 +520,11 @@ export interface ContextDocument {
   /** Original filename */
   name: string
   /** File type (pdf, docx) */
-  type: 'pdf' | 'docx'
+  type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'html' | 'image'
   /** File size in bytes */
   size: number
-  /** Extracted text content (markdown) */
-  extractedText: string
+  /** Path to extracted markdown file on disk */
+  extractedTextPath: string
   /** When the document was added */
   addedAt: number
 }

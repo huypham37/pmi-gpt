@@ -51,7 +51,8 @@ export function buildAugmentedPrompt(
     }
     if (projectContext.documents.length > 0) {
       const docSummaries = projectContext.documents
-        .map(d => `#### ${d.name}\n${d.extractedText.slice(0, 2000)}`)
+        // TODO: add error if total document size exceeds Claude context window limit
+        .map(d => `#### ${d.name}\n${d.extractedText}`)
         .join('\n\n')
       parts.push(`**Uploaded Documents:**\n${docSummaries}`)
     }
