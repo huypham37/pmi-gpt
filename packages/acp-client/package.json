@@ -1,13 +1,12 @@
 {
   "name": "@craft-agent/acp-client",
   "version": "0.1.0",
-  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "build": "bun build src/index.ts --outfile dist/index.js --target node --format cjs",
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
