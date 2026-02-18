@@ -175,10 +175,25 @@ async function stepLMStudioSelection(attackVector: string): Promise<{ primary: W
 // Step 3: Build Augmented Prompt
 // ============================================================================
 
-function stepBuildPrompt(attackVector: string, selection: { primary: WSTGEntry | null; secondary: WSTGEntry[] }): string {
-  header('Step 3: Build Augmented Prompt')
+// Synthetic project context to simulate a real workspace with context layer
+const SYNTHETIC_PROJECT_CONTEXT = {
+  description: 'Healthcare SaaS platform. Tech stack: Next.js 14, Prisma ORM, PostgreSQL 15. Auth: NextAuth with Google OAuth + email/password. Key endpoints: /api/patients, /api/appointments, /api/billing. HIPAA-compliant data handling required. All API routes behind JWT middleware.',
+  documents: [
+    {
+      name: 'api-documentation.pdf',
+      extractedText: '## API Endpoints\n\nPOST /api/patients - Create patient record (requires admin role)\nGET /api/patients/:id - Get patient by ID (requires auth)\nPUT /api/patients/:id - Update patient (requires admin role)\nDELETE /api/patients/:id - Soft delete (requires superadmin)\nGET /api/patients/search?q= - Full-text search across patient records\n\nPOST /api/appointments - Book appointment\nGET /api/billing/invoices - List invoices for authenticated user\n\nAll endpoints validate JWT token in Authorization header.\nRate limited to 100 req/min per user.\nInput validation via Zod schemas on all POST/PUT bodies.',
+    },
+    {
+      name: 'architecture-overview.docx',
+      extractedText: '## Architecture\n\nThe application uses a microservices architecture:\n- API Gateway (Next.js API routes)\n- Auth Service (NextAuth + bcrypt password hashing)\n- Patient Service (Prisma + PostgreSQL)\n- Notification Service (SendGrid)\n\nAll inter-service communication uses signed JWTs.\nDatabase connections use connection pooling via PgBouncer.\nFile uploads stored in S3 with presigned URLs.\nCSRF protection via double-submit cookie pattern.',
+    },
+  ],
+}
 
-  const prompt = buildAugmentedPrompt(attackVector, selection)
+function stepBuildPrompt(attackVector: string, selection: { primary: WSTGEntry | null; secondary: WSTGEntry[] }): string {
+  header('Step 3: Build Augmented Prompt (with Project Context)')
+
+  const prompt = buildAugmentedPrompt(attackVector, selection, SYNTHETIC_PROJECT_CONTEXT)
 
   info(`Prompt length: ${prompt.length} chars`)
 
@@ -188,6 +203,10 @@ function stepBuildPrompt(attackVector: string, selection: { primary: WSTGEntry |
     { label: 'Contains Primary WSTG Reference', ok: prompt.includes('### Primary WSTG Reference') },
     { label: 'Contains test case instructions', ok: prompt.includes('**Name:**') },
     { label: 'Contains separator instruction', ok: prompt.includes('Separate each test case with a single --- on its own line') },
+    { label: 'Contains Project Context section', ok: prompt.includes('### Project Context (specific to the application being tested)') },
+    { label: 'Contains project description', ok: prompt.includes('Healthcare SaaS platform') },
+    { label: 'Contains document: api-documentation.pdf', ok: prompt.includes('#### api-documentation.pdf') },
+    { label: 'Contains document: architecture-overview.docx', ok: prompt.includes('#### architecture-overview.docx') },
   ]
 
   if (selection.secondary.length > 0) {
@@ -317,6 +336,7 @@ function stepParseTestCases(responseText: string, sessionId: string): ReturnType
   pass(`Generated ${testCases.length} structured TestCase objects`)
 
   // Validate each test case
+  let missingAttackVector = 0
   for (const tc of testCases) {
     const checks: string[] = []
     if (!tc.id) checks.push('missing id')
@@ -331,11 +351,20 @@ function stepParseTestCases(responseText: string, sessionId: string): ReturnType
     }
 
     // Show details
+    if (tc.attackVector) dim(`  Attack Vector: ${tc.attackVector}`)
+    else { dim(`  Attack Vector: ${RED}(missing)${RESET}`); missingAttackVector++ }
     if (tc.targetComponent) dim(`  Target: ${tc.targetComponent}`)
     if (tc.description) dim(`  Description: ${tc.description.slice(0, 100)}...`)
     if (tc.reference?.length) {
       dim(`  References: ${tc.reference.map(r => r.id).join(', ')}`)
     }
+  }
+
+  // Summary check for attack vector field
+  if (missingAttackVector > 0) {
+    warn(`${missingAttackVector}/${testCases.length} test cases missing Attack Vector field`)
+  } else {
+    pass(`All ${testCases.length} test cases have Attack Vector field`)
   }
 
   return testCases
@@ -357,6 +386,7 @@ function stepFinalOutput(results: StepResults) {
   for (let i = 0; i < results.testCases.length; i++) {
     const tc = results.testCases[i]
     console.log(`${BOLD}${CYAN}Test Case ${i + 1}: ${tc.name}${RESET}`)
+    if (tc.attackVector) console.log(`  ${BOLD}Attack Vector:${RESET} ${tc.attackVector}`)
     if (tc.targetComponent) console.log(`  ${BOLD}Target:${RESET} ${tc.targetComponent}`)
     if (tc.description) console.log(`  ${BOLD}Description:${RESET} ${tc.description.slice(0, 150)}${tc.description.length > 150 ? '...' : ''}`)
     if (tc.preconditions) console.log(`  ${BOLD}Preconditions:${RESET} ${tc.preconditions.slice(0, 150)}${tc.preconditions.length > 150 ? '...' : ''}`)

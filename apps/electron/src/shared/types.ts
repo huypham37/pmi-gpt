@@ -508,6 +508,41 @@ export const extractTestCaseMeta = (tc: TestCase): TestCaseMeta => ({
 })
 
 // ============================================
+// Project Context Types
+// ============================================
+
+/**
+ * Metadata for an uploaded context document
+ */
+export interface ContextDocument {
+  /** Unique document ID */
+  id: string
+  /** Original filename */
+  name: string
+  /** File type (pdf, docx) */
+  type: 'pdf' | 'docx'
+  /** File size in bytes */
+  size: number
+  /** Extracted text content (markdown) */
+  extractedText: string
+  /** When the document was added */
+  addedAt: number
+}
+
+/**
+ * Project context for test case generation
+ * Stored at workspace/context/manifest.json
+ */
+export interface ProjectContext {
+  /** Free-text project description (tech stack, architecture, endpoints, etc.) */
+  description: string
+  /** Uploaded context documents */
+  documents: ContextDocument[]
+  /** Last updated timestamp */
+  updatedAt: number
+}
+
+// ============================================
 // Test Cases Navigation State
 // ============================================
 
@@ -911,6 +946,12 @@ export const IPC_CHANNELS = {
   TESTCASES_SAVE_BATCH: 'testcases:saveBatch',
   TESTCASES_DELETE: 'testcases:delete',
   TESTCASES_DELETE_ALL: 'testcases:deleteAll',
+
+  // Project Context (workspace-scoped)
+  CONTEXT_GET: 'context:get',
+  CONTEXT_SAVE_DESCRIPTION: 'context:saveDescription',
+  CONTEXT_ADD_DOCUMENT: 'context:addDocument',
+  CONTEXT_REMOVE_DOCUMENT: 'context:removeDocument',
 } as const
 
 // Re-import types for ElectronAPI
@@ -1211,6 +1252,12 @@ export interface ElectronAPI {
   saveTestCases(testCases: TestCase[]): Promise<void>
   deleteTestCase(id: string): Promise<void>
   deleteAllTestCases(): Promise<void>
+
+  // Project Context
+  getProjectContext(workspaceId: string): Promise<ProjectContext>
+  saveProjectContextDescription(workspaceId: string, description: string): Promise<ProjectContext>
+  addProjectContextDocument(workspaceId: string, filePath: string): Promise<ProjectContext>
+  removeProjectContextDocument(workspaceId: string, documentId: string): Promise<ProjectContext>
 }
 
 /**

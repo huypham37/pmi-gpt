@@ -19,6 +19,7 @@ export interface WSTGSelection {
 export function buildAugmentedPrompt(
   attackVector: string,
   selection: WSTGSelection,
+  projectContext?: { description: string; documents: Array<{ name: string; extractedText: string }> },
 ): string {
   if (!selection.primary) {
     return `Create detailed security test cases for the following attack vector: ${attackVector}`
@@ -41,11 +42,27 @@ export function buildAugmentedPrompt(
     secondaryContext = `\n\n### Secondary WSTG References (for additional context)\n${secondarySummaries}`
   }
 
+  // Build project context section if available
+  let projectContextSection = ''
+  if (projectContext && (projectContext.description || projectContext.documents.length > 0)) {
+    const parts: string[] = ['### Project Context (specific to the application being tested)']
+    if (projectContext.description) {
+      parts.push(`**Project Description:**\n${projectContext.description}`)
+    }
+    if (projectContext.documents.length > 0) {
+      const docSummaries = projectContext.documents
+        .map(d => `#### ${d.name}\n${d.extractedText.slice(0, 2000)}`)
+        .join('\n\n')
+      parts.push(`**Uploaded Documents:**\n${docSummaries}`)
+    }
+    projectContextSection = '\n\n' + parts.join('\n\n')
+  }
+
   return `Create detailed security test cases for the following attack vector: ${attackVector}
 
 Use the following OWASP WSTG entries as context:
 
-${primaryContext}${secondaryContext}
+${primaryContext}${secondaryContext}${projectContextSection}
 
 STRICT OUTPUT FORMAT — follow this exactly, no deviations:
 - Do NOT include any preamble, introduction, or commentary before the first test case.
@@ -53,8 +70,8 @@ STRICT OUTPUT FORMAT — follow this exactly, no deviations:
 - Each test case MUST use exactly these bold field labels on separate lines:
 
 **Name:** A descriptive test case name
-**Attack Vector:** A concise label for the attack type (e.g. "SQL injection", "Reflected XSS")
-**Target Component:** The specific component/endpoint being tested
+**Attack Vector:** Analyze the user's attack vector "${attackVector}" — classify and restate it as a specific attack technique (e.g. "SQL injection via search parameter", "Reflected XSS in comment field"). MUST relate to the original query.
+**Target Component:** The specific component/endpoint being tested (use project context if available)
 **Description:** What this test case validates
 **Preconditions:** Requirements before running the test
 **Guidance:**
