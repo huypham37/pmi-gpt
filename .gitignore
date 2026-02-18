@@ -1,3 +1,6 @@
+# Windows Zone.Identifier alternate data streams
+*:Zone.Identifier
+
 # dependencies (bun install)
 node_modules
 
