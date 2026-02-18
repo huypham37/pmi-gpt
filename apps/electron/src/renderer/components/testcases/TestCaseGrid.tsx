@@ -1,8 +1,9 @@
 import React, { memo, useCallback, useMemo } from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import type { TestCaseMeta } from '../../../shared/types';
 import {
   testCaseMetaMapAtom,
+  removeTestCaseAtom,
 } from '@/atoms/testcases';
 import { TestCaseCard } from './TestCaseCard';
 
@@ -24,6 +25,7 @@ export const TestCaseGrid = memo(function TestCaseGrid({
   onExpandTestCase,
 }: TestCaseGridProps) {
   const metaMap = useAtomValue(testCaseMetaMapAtom);
+  const removeTestCase = useSetAtom(removeTestCaseAtom);
 
   // Resolve metas from IDs (already LIFO ordered)
   const testCases = useMemo(() => {
@@ -51,6 +53,13 @@ export const TestCaseGrid = memo(function TestCaseGrid({
     [onExpandTestCase]
   );
 
+  const handleDelete = useCallback(
+    (testCaseId: string) => {
+      removeTestCase(testCaseId);
+    },
+    [removeTestCase]
+  );
+
   if (testCases.length === 0) {
     return null;
   }
@@ -68,6 +77,7 @@ export const TestCaseGrid = memo(function TestCaseGrid({
             isSelected={testCase.id === selectedTestCaseId}
             onClick={() => handleSelect(testCase.id)}
             onExpand={() => handleExpand(testCase.id)}
+            onDelete={() => handleDelete(testCase.id)}
           />
         ))}
       </div>

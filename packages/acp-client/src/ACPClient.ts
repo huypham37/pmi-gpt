@@ -98,7 +98,6 @@ export class ACPClient {
       const wslOpencode = resolveWslOpencode();
       executable = "wsl.exe";
       args = [wslOpencode, ...(opts.arguments ?? ["acp"])];
-      console.log(`[ACP-DEBUG] Windows detected, routing through WSL: wsl.exe ${wslOpencode} ${(opts.arguments ?? ["acp"]).join(" ")}`);
     } else {
       executable = opts.executable;
       args = opts.arguments ?? ["acp"];
@@ -120,15 +119,11 @@ export class ACPClient {
   }
 
   async start(): Promise<void> {
-    console.log('[ACP-DEBUG] ACPClient.start() called');
     this.transport.onData = (data: Buffer) => {
       this.handleIncomingData(data);
     };
-    console.log('[ACP-DEBUG] Starting transport...');
     await this.transport.start();
-    console.log('[ACP-DEBUG] Transport started, sending initialize request...');
     await this.initialize();
-    console.log('[ACP-DEBUG] ACPClient fully initialized');
   }
 
   stop(): void {

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   BookOpen,
   ShieldAlert,
+  Trash2,
 } from 'lucide-react';
 import type { TestCaseMeta } from '../../../shared/types';
 
@@ -14,6 +15,7 @@ interface TestCaseCardProps {
   isSelected?: boolean;
   onClick?: (testCaseId: string) => void;
   onExpand?: (testCaseId: string) => void;
+  onDelete?: (testCaseId: string) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -22,6 +24,7 @@ export const TestCaseCard = memo(function TestCaseCard({
   isSelected,
   onClick,
   onExpand,
+  onDelete,
 }: TestCaseCardProps) {
   const handleClick = useCallback(() => {
     onClick?.(testCase.id);
@@ -33,6 +36,14 @@ export const TestCaseCard = memo(function TestCaseCard({
       onExpand?.(testCase.id);
     },
     [onExpand, testCase.id]
+  );
+
+  const handleDelete = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDelete?.(testCase.id);
+    },
+    [onDelete, testCase.id]
   );
 
   return (
@@ -59,17 +70,30 @@ export const TestCaseCard = memo(function TestCaseCard({
           <h4 className="text-sm font-medium text-foreground leading-tight line-clamp-2">
             {testCase.name}
           </h4>
-          <button
-            onClick={handleExpand}
-            className={cn(
-              'flex-shrink-0 p-1 rounded transition-colors',
-              'text-muted-foreground hover:text-foreground hover:bg-accent',
-              'opacity-0 group-hover:opacity-100'
-            )}
-            title="View report"
-          >
-            <Code2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleExpand}
+              className={cn(
+                'flex-shrink-0 p-1 rounded transition-colors',
+                'text-muted-foreground hover:text-foreground hover:bg-accent',
+                'opacity-0 group-hover:opacity-100'
+              )}
+              title="View report"
+            >
+              <Code2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleDelete}
+              className={cn(
+                'flex-shrink-0 p-1 rounded transition-colors',
+                'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
+                'opacity-0 group-hover:opacity-100'
+              )}
+              title="Delete test case"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Target */}

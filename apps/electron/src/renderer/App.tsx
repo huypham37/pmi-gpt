@@ -760,15 +760,20 @@ export default function App() {
         if (failedCount > 0) {
           console.warn(`${failedCount} attachment(s) failed to store`)
           // Add warning message to session so user knows some attachments weren't included
-          const failedNames = attachments
+          const rejectedResults = storeResults.filter(r => r.status === 'rejected')
+          const failedDetails = attachments
             .filter((_, i) => storeResults[i].status === 'rejected')
-            .map(a => a.name)
-            .join(', ')
+            .map((a, i) => {
+              const reason = rejectedResults[i]?.reason
+              const message = reason instanceof Error ? reason.message : String(reason ?? 'Unknown error')
+              return `${a.name}: ${message}`
+            })
+            .join('\n')
           updateSessionById(sessionId, (s) => ({
             messages: [...s.messages, {
               id: generateMessageId(),
               role: 'warning' as const,
-              content: `⚠️ ${failedCount} attachment(s) could not be stored and will not be sent: ${failedNames}`,
+              content: `⚠️ ${failedCount} attachment(s) could not be stored and will not be sent:\n${failedDetails}`,
               timestamp: Date.now()
             }]
           }))

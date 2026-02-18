@@ -58,6 +58,38 @@ No. Everything is instant. Mention new skills or sources with `@`, even mid-conv
 Yes. That's the core idea behind agent-native software. You describe what you want, and it figures out how. That's a good use of tokens.
 
 
+## External Dependencies
+
+Some features require third-party tools to be installed and available on your system PATH.
+
+### Docling (File Attachments — PDF, DOCX, PPTX, XLSX)
+
+[Docling](https://github.com/DS4SD/docling) is used to convert documents (PDF, Word, PowerPoint, Excel) into readable text before sending them to the agent. Without it, only plain-text and image attachments work.
+
+**Install:**
+
+```bash
+pip install docling
+```
+
+**Windows note:** After installing via `pip`, the `docling` CLI may not be on your PATH. To fix this, add your Python Scripts directory to PATH:
+
+```powershell
+# Find the Scripts directory
+python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+
+# Add it to your user PATH (replace <path> with the output above)
+[Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";<path>", "User")
+```
+
+Then restart your terminal. Verify with:
+
+```powershell
+docling --version
+```
+
+---
+
 ## Installation
 
 ### One-Line Install (Recommended)
