@@ -18,9 +18,11 @@ import { useAppShellContext } from '@/context/AppShellContext'
 import { StoplightProvider } from '@/context/StoplightContext'
 import {
   useNavigationState,
+  useNavigation,
   isChatsNavigation,
   isSettingsNavigation,
   isTestCasesNavigation,
+  routes,
 } from '@/contexts/NavigationContext'
 import {
   AppSettingsPage,
@@ -47,6 +49,7 @@ export function MainContentPanel({
   className,
 }: MainContentPanelProps) {
   const navState = useNavigationState()
+  const { navigate } = useNavigation()
   const { activeWorkspaceId } = useAppShellContext()
 
   // Wrap content with StoplightProvider so PanelHeaders auto-compensate in focused mode
@@ -119,6 +122,9 @@ export function MainContentPanel({
           generationSessionId={details?.sessionId}
           initialViewMode={details?.viewMode || 'grid'}
           initialTestCaseId={details?.testCaseId}
+          onOpenChat={(input) =>
+            navigate(routes.action.newChat({ input, send: input ? true : undefined }))
+          }
         />
       </Panel>
     )

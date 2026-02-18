@@ -19,6 +19,9 @@ export interface StoredTestCase {
   generationSessionId: string;
   name: string;
   
+  /** The original attack vector question that generated this test case */
+  attackVector?: string;
+  
   // Target (simplified)
   targetComponent?: string;
   

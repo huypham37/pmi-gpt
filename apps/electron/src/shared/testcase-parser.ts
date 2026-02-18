@@ -6,6 +6,7 @@ import type { TestCase, Reference } from './types'
  */
 export interface ParsedTestCase {
   name: string
+  attackVector?: string
   targetComponent?: string
   description?: string
   preconditions?: string
@@ -20,6 +21,7 @@ export interface ParsedTestCase {
  *
  * ```
  * **Name:** Basic <script> Tag Injection
+ * **Attack Vector:** Reflected XSS
  * **Target Component:** Comment body field in POST /api/comments
  * **Description:** Tests whether the application properly sanitizes ...
  *
@@ -38,6 +40,7 @@ export function parseSingleTestCase(block: string): ParsedTestCase | null {
   const name = extractField(block, 'Name')
   if (!name) return null
 
+  const attackVector = extractField(block, 'Attack Vector')
   const targetComponent = extractField(block, 'Target Component')
   const description = extractField(block, 'Description')
   const preconditions = extractField(block, 'Preconditions')
@@ -54,6 +57,7 @@ export function parseSingleTestCase(block: string): ParsedTestCase | null {
 
   return {
     name,
+    attackVector,
     targetComponent,
     description,
     preconditions,
@@ -95,6 +99,7 @@ export function toTestCases(
     workspaceId,
     generationSessionId: sessionId,
     name: p.name,
+    attackVector: p.attackVector,
     targetComponent: p.targetComponent,
     description: p.description,
     preconditions: p.preconditions,

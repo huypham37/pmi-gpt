@@ -8,6 +8,7 @@ import { TestCaseReportView } from '@/components/testcases/TestCaseReportView';
 import { testCaseIdsForSessionAtomFamily, addTestCaseAtom, loadAllTestCasesAtom, allTestCaseIdsAtom } from '@/atoms/testcases';
 import { MOCK_SESSION_ID_VALUE } from '@/components/testcases/mockTestCases';
 import { useAppShellContext } from '@/context/AppShellContext';
+import { formatTestCaseChatInput } from '@/lib/format-testcase-chat-input';
 import type { TestCase, TestCaseViewMode } from '../../shared/types';
 
 // ---------------------------------------------------------------------------
@@ -18,7 +19,7 @@ interface TestCaseGeneratorPageProps {
   generationSessionId?: string;
   initialViewMode?: TestCaseViewMode;
   initialTestCaseId?: string;
-  onOpenChat?: (sessionId: string) => void;
+  onOpenChat?: (input?: string) => void;
   onBack?: () => void;
 }
 
@@ -62,12 +63,10 @@ export function TestCaseGeneratorPage({
     setViewMode('grid');
   }, []);
 
-  const handleOpenChat = useCallback(() => {
-    const chatSessionId = sessionId ?? generationSessionId;
-    if (chatSessionId) {
-      onOpenChat?.(chatSessionId);
-    }
-  }, [onOpenChat, sessionId, generationSessionId]);
+  const handleOpenChat = useCallback((testCase?: TestCase) => {
+    const input = testCase ? formatTestCaseChatInput(testCase) : undefined;
+    onOpenChat?.(input);
+  }, [onOpenChat]);
 
   const handleSubmit = useCallback(async (message: string) => {
     if (!message.trim() || isGenerating) return;
@@ -118,7 +117,7 @@ export function TestCaseGeneratorPage({
             title="Test Case Generator"
             actions={
               <button
-                onClick={handleOpenChat}
+                onClick={() => handleOpenChat()}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium
                   text-muted-foreground hover:text-foreground rounded-md
                   hover:bg-muted/50 transition-colors"

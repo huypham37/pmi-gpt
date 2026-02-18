@@ -53,6 +53,7 @@ STRICT OUTPUT FORMAT — follow this exactly, no deviations:
 - Each test case MUST use exactly these bold field labels on separate lines:
 
 **Name:** A descriptive test case name
+**Attack Vector:** A concise label for the attack type (e.g. "SQL injection", "Reflected XSS")
 **Target Component:** The specific component/endpoint being tested
 **Description:** What this test case validates
 **Preconditions:** Requirements before running the test

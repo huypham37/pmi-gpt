@@ -111,6 +111,31 @@ describe('parseSingleTestCase', () => {
     expect(result!.guidance).toContain('Expected: 200 OK')
     expect(result!.guidance).toContain('Example: curl -X POST /api')
   })
+
+  it('parses attackVector field', () => {
+    const block = `
+**Name:** SQL Injection Test
+**Attack Vector:** SQL injection
+**Target Component:** Login form username parameter
+**Description:** Tests for SQL injection in the login form.
+`
+    const result = parseSingleTestCase(block)
+
+    expect(result).not.toBeNull()
+    expect(result!.attackVector).toBe('SQL injection')
+  })
+
+  it('returns undefined attackVector when field is absent', () => {
+    const block = `
+**Name:** No Attack Vector Test
+**Target Component:** Some component
+**Description:** No attack vector field.
+`
+    const result = parseSingleTestCase(block)
+
+    expect(result).not.toBeNull()
+    expect(result!.attackVector).toBeUndefined()
+  })
 })
 
 // ============================================================================
@@ -222,5 +247,25 @@ describe('toTestCases', () => {
     expect(results[1].name).toBe('TC2')
     // IDs should be unique
     expect(results[0].id).not.toBe(results[1].id)
+  })
+
+  it('maps attackVector from parsed result to TestCase', () => {
+    const parsed = [
+      { name: 'SQLi Test', attackVector: 'SQL injection', targetComponent: 'Login form' },
+    ]
+
+    const results = toTestCases(parsed, 'session-1', 'workspace-1')
+
+    expect(results[0].attackVector).toBe('SQL injection')
+  })
+
+  it('leaves attackVector undefined when not in parsed result', () => {
+    const parsed = [
+      { name: 'No Vector Test' },
+    ]
+
+    const results = toTestCases(parsed, 'session-1', 'workspace-1')
+
+    expect(results[0].attackVector).toBeUndefined()
   })
 })

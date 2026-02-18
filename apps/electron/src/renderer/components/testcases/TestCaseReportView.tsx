@@ -20,7 +20,7 @@ import type { TestCase } from '../../../shared/types'
 interface TestCaseReportViewProps {
   testCaseId: string
   onBack: () => void
-  onOpenChat?: () => void
+  onOpenChat?: (testCase: TestCase) => void
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -163,7 +163,7 @@ export const TestCaseReportView = memo(function TestCaseReportView({
         </div>
         {onOpenChat && (
           <button
-            onClick={onOpenChat}
+            onClick={() => onOpenChat(testCase)}
             className="titlebar-no-drag flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
           >
             <MessageSquare className="w-3.5 h-3.5" />

@@ -439,6 +439,9 @@ export interface TestCase {
   // Display basics
   /** Test case title (shown on cards) */
   name: string
+  
+  /** The original attack vector question that generated this test case */
+  attackVector?: string
 
   // Target (simplified)
   /** What this test targets (e.g., "Login form username parameter") */
