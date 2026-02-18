@@ -49,7 +49,7 @@ import { type Session, type Message, type SessionEvent, type FileAttachment, typ
 import { generateSessionTitle, regenerateSessionTitle, formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrl, getEmojiIcon, resetSummarizationClient, resolveToolIcon } from '@craft-agent/shared/utils'
 import { loadWorkspaceSkills, type LoadedSkill } from '@craft-agent/shared/skills'
 import type { ToolDisplayMeta } from '@craft-agent/core/types'
-import { DEFAULT_MODEL, getToolIconsDir, getMode } from '@craft-agent/shared/config'
+import { DEFAULT_MODEL, getToolIconsDir, getMode, getModel } from '@craft-agent/shared/config'
 import { type ThinkingLevel, DEFAULT_THINKING_LEVEL } from '@craft-agent/shared/agent/thinking-levels'
 import { evaluateAutoLabels } from '@craft-agent/shared/labels/auto'
 import { listLabels } from '@craft-agent/shared/labels/storage'
@@ -1394,8 +1394,9 @@ export class SessionManager {
       isFlagged: options?.isFlagged,
     })
 
-    // Model priority: options.model > storedSession.model > workspace default
-    const resolvedModel = options?.model || storedSession.model || defaultModel
+    // Model priority: options.model > global config (AppSettings) > storedSession.model > workspace default > hardcoded default
+    const globalConfigModel = getModel()
+    const resolvedModel = options?.model || globalConfigModel || storedSession.model || defaultModel || DEFAULT_MODEL
 
     // Log mini agent session creation
     if (options?.systemPromptPreset === 'mini' || options?.model) {
@@ -1426,9 +1427,15 @@ export class SessionManager {
       backgroundShellCommands: new Map(),
       messagesLoaded: true,  // New sessions don't need to load messages from disk
       hidden: options?.hidden,
+      profile: options?.profile,
     }
 
     this.sessions.set(storedSession.id, managed)
+
+    // Set profile if provided (e.g., 'testcase' for test case generation sessions)
+    if (options?.profile) {
+      await this.setSessionProfile(storedSession.id, options.profile)
+    }
 
     return {
       id: storedSession.id,
@@ -1446,6 +1453,7 @@ export class SessionManager {
       thinkingLevel: defaultThinkingLevel,
       sessionFolderPath: getSessionStoragePath(workspaceRootPath, storedSession.id),
       hidden: options?.hidden,
+      profile: options?.profile,
     }
   }
 

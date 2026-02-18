@@ -57,6 +57,7 @@ import {
   isSourcesNavigation,
   isSettingsNavigation,
   isSkillsNavigation,
+  isTestCasesNavigation,
   DEFAULT_NAVIGATION_STATE,
 } from '../../shared/types'
 import { sessionMetaMapAtom, updateSessionMetaAtom, type SessionMeta } from '@/atoms/sessions'
@@ -69,7 +70,7 @@ export type { Route }
 
 // Re-export navigation state types for consumers
 export type { NavigationState, ChatFilter }
-export { isChatsNavigation, isSourcesNavigation, isSettingsNavigation, isSkillsNavigation }
+export { isChatsNavigation, isSourcesNavigation, isSettingsNavigation, isSkillsNavigation, isTestCasesNavigation }
 
 interface NavigationContextValue {
   /** Navigate to a route */
@@ -431,6 +432,12 @@ export function NavigationProvider({
           setNavigationState(newState)
           return newState
         }
+      }
+
+      // For test cases: apply state directly (no auto-selection needed for grid view)
+      if (isTestCasesNavigation(newState)) {
+        setNavigationState(newState)
+        return newState
       }
 
       // For chats with explicit session: update session selection

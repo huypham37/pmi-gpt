@@ -481,6 +481,34 @@ const api: ElectronAPI = {
   menuCopy: () => ipcRenderer.invoke(IPC_CHANNELS.MENU_COPY),
   menuPaste: () => ipcRenderer.invoke(IPC_CHANNELS.MENU_PASTE),
   menuSelectAll: () => ipcRenderer.invoke(IPC_CHANNELS.MENU_SELECT_ALL),
+
+  // Test Case Generation (RAG via LMStudio + ACP)
+  generateTestCases: (workspaceId: string, attackVector: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.TESTCASES_GENERATE, workspaceId, attackVector),
+
+  // Test Cases (flat global storage)
+  listTestCases: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.TESTCASES_LIST),
+  getTestCase: (id: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.TESTCASES_GET, id),
+  saveTestCase: (testCase: import('../shared/types').TestCase) =>
+    ipcRenderer.invoke(IPC_CHANNELS.TESTCASES_SAVE, testCase),
+  saveTestCases: (testCases: import('../shared/types').TestCase[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.TESTCASES_SAVE_BATCH, testCases),
+  deleteTestCase: (id: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.TESTCASES_DELETE, id),
+  deleteAllTestCases: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.TESTCASES_DELETE_ALL),
+
+  // Project Context
+  getProjectContext: (workspaceId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CONTEXT_GET, workspaceId),
+  saveProjectContextDescription: (workspaceId: string, description: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CONTEXT_SAVE_DESCRIPTION, workspaceId, description),
+  addProjectContextDocument: (workspaceId: string, filePath: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CONTEXT_ADD_DOCUMENT, workspaceId, filePath),
+  removeProjectContextDocument: (workspaceId: string, documentId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CONTEXT_REMOVE_DOCUMENT, workspaceId, documentId),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

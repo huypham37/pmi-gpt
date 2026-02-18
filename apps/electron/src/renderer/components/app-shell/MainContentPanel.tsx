@@ -18,8 +18,11 @@ import { useAppShellContext } from '@/context/AppShellContext'
 import { StoplightProvider } from '@/context/StoplightContext'
 import {
   useNavigationState,
+  useNavigation,
   isChatsNavigation,
   isSettingsNavigation,
+  isTestCasesNavigation,
+  routes,
 } from '@/contexts/NavigationContext'
 import {
   AppSettingsPage,
@@ -32,6 +35,7 @@ import {
   PreferencesPage,
   ChatPage,
 } from '@/pages'
+import { TestCaseGeneratorPage } from '@/pages/TestCaseGeneratorPage'
 
 export interface MainContentPanelProps {
   /** Whether the app is in focused mode (single chat, no sidebar) */
@@ -45,6 +49,7 @@ export function MainContentPanel({
   className,
 }: MainContentPanelProps) {
   const navState = useNavigationState()
+  const { navigate } = useNavigation()
   const { activeWorkspaceId } = useAppShellContext()
 
   // Wrap content with StoplightProvider so PanelHeaders auto-compensate in focused mode
@@ -104,6 +109,23 @@ export function MainContentPanel({
               : 'No conversations yet'}
           </p>
         </div>
+      </Panel>
+    )
+  }
+
+  // Test Cases navigator - always show test case generator with input ready
+  if (isTestCasesNavigation(navState)) {
+    const details = navState.details
+    return wrapWithStoplight(
+      <Panel variant="grow" className={className}>
+        <TestCaseGeneratorPage
+          generationSessionId={details?.sessionId}
+          initialViewMode={details?.viewMode || 'grid'}
+          initialTestCaseId={details?.testCaseId}
+          onOpenChat={(input) =>
+            navigate(routes.action.newChat({ input, send: input ? true : undefined }))
+          }
+        />
       </Panel>
     )
   }

@@ -2338,4 +2338,199 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
   // Note: Permission mode cycling settings (cyclablePermissionModes) are now workspace-level
   // and managed via WORKSPACE_SETTINGS_GET/UPDATE channels
 
+  // ============================================================
+  // Test Case Generation (RAG via LMStudio + ACP)
+  // ============================================================
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_GENERATE, async (_event, workspaceId: string, attackVector: string) => {
+    const { selectRelevantWSTGEntries, buildAugmentedPrompt } = await import('./lmstudio')
+    const { parseTestCasesFromResponse, toTestCases } = await import('../shared/testcase-parser')
+
+    ipcLog.info(`[TestCaseGen] Starting generation for: "${attackVector}" in workspace ${workspaceId}`)
+
+    // Step 0: Load project context (graceful fallback if empty/missing)
+    const projectContext = await getOrCreateContext(workspaceId)
+
+    // Step 1: RAG — use LMStudio to select 1 primary + 2 secondary WSTG entries
+    const selection = await selectRelevantWSTGEntries(attackVector)
+    ipcLog.info(`[TestCaseGen] Selected WSTG entries: primary=${selection.primary?.id ?? 'none'}, secondary=${selection.secondary.map(e => e.id).join(', ') || 'none'}`)
+
+    // Step 2: Build augmented prompt with full WSTG context + project context
+    const augmentedPrompt = buildAugmentedPrompt(attackVector, selection, projectContext)
+
+    // Step 3: Create ACP session and send prompt to OpenCode
+    const session = await sessionManager.createSession(workspaceId, {
+      profile: 'testcase',
+      hidden: true,
+    })
+
+    await sessionManager.sendMessage(session.id, augmentedPrompt)
+
+    // Step 4: Collect the full response from session messages
+    const fullSession = await sessionManager.getSession(session.id)
+    const assistantMessages = fullSession?.messages
+      .filter((m) => m.role === 'assistant')
+      .map((m) => m.content)
+      .join('\n') ?? ''
+
+    ipcLog.info(`[TestCaseGen] Received ${assistantMessages.length} chars from ACP`)
+
+    // Step 5: Parse markdown response into structured TestCase objects
+    const parsed = parseTestCasesFromResponse(assistantMessages)
+    const testCases = toTestCases(parsed, session.id, workspaceId)
+
+    ipcLog.info(`[TestCaseGen] Parsed ${testCases.length} test cases`)
+
+    // Step 6: Persist test cases to disk
+    const { saveTestCases } = await import('@craft-agent/shared/testcases/storage')
+    saveTestCases(testCases)
+
+    return testCases
+  })
+
+  // ============================================================
+  // Test Cases
+  // ============================================================
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_LIST, async () => {
+    const { listTestCases } = await import('@craft-agent/shared/testcases/storage')
+    return listTestCases()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_GET, async (_event, id: string) => {
+    const { getTestCase } = await import('@craft-agent/shared/testcases/storage')
+    return getTestCase(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_SAVE, async (_event, testCase: import('../shared/types').TestCase) => {
+    const { saveTestCase } = await import('@craft-agent/shared/testcases/storage')
+    saveTestCase(testCase)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_SAVE_BATCH, async (_event, testCases: import('../shared/types').TestCase[]) => {
+    const { saveTestCases } = await import('@craft-agent/shared/testcases/storage')
+    saveTestCases(testCases)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_DELETE, async (_event, id: string) => {
+    const { deleteTestCase } = await import('@craft-agent/shared/testcases/storage')
+    deleteTestCase(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TESTCASES_DELETE_ALL, async () => {
+    const { deleteAllTestCases } = await import('@craft-agent/shared/testcases/storage')
+    deleteAllTestCases()
+  })
+
+  // ============================================================
+  // Project Context
+  // ============================================================
+
+  // Helper: get or create empty project context
+  const getOrCreateContext = async (workspaceId: string): Promise<import('../shared/types').ProjectContext> => {
+    const workspace = getWorkspaceOrThrow(workspaceId)
+    const contextDir = join(workspace.rootPath, 'context')
+    const manifestPath = join(contextDir, 'manifest.json')
+
+    try {
+      const content = await readFile(manifestPath, 'utf-8')
+      return JSON.parse(content)
+    } catch {
+      return { description: '', documents: [], updatedAt: Date.now() }
+    }
+  }
+
+  // Helper: persist project context to disk
+  const saveContext = async (workspaceId: string, context: import('../shared/types').ProjectContext) => {
+    const workspace = getWorkspaceOrThrow(workspaceId)
+    const contextDir = join(workspace.rootPath, 'context')
+    await mkdir(contextDir, { recursive: true })
+    const manifestPath = join(contextDir, 'manifest.json')
+    context.updatedAt = Date.now()
+    await writeFile(manifestPath, JSON.stringify(context, null, 2), 'utf-8')
+  }
+
+  ipcMain.handle(IPC_CHANNELS.CONTEXT_GET, async (_event, workspaceId: string) => {
+    return getOrCreateContext(workspaceId)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.CONTEXT_SAVE_DESCRIPTION, async (_event, workspaceId: string, description: string) => {
+    const context = await getOrCreateContext(workspaceId)
+    context.description = description
+    await saveContext(workspaceId, context)
+    return context
+  })
+
+  ipcMain.handle(IPC_CHANNELS.CONTEXT_ADD_DOCUMENT, async (_event, workspaceId: string, filePath: string) => {
+    const workspace = getWorkspaceOrThrow(workspaceId)
+    const ext = filePath.split('.').pop()?.toLowerCase()
+    if (ext !== 'pdf' && ext !== 'docx') {
+      throw new Error('Only PDF and DOCX files are supported')
+    }
+
+    // Read original file
+    const fileBuffer = await readFile(filePath)
+    const fileName = basename(filePath)
+    const docId = randomUUID()
+
+    // Copy document to workspace context/docs/
+    const docsDir = join(workspace.rootPath, 'context', 'docs')
+    await mkdir(docsDir, { recursive: true })
+    const storedName = `${docId}_${sanitizeFilename(fileName)}`
+    const storedPath = join(docsDir, storedName)
+    await writeFile(storedPath, fileBuffer)
+
+    // Extract text using MarkItDown (already available in this file)
+    let extractedText = ''
+    try {
+      const markitdown = new MarkItDown()
+      const result = await markitdown.convert(storedPath)
+      extractedText = result?.textContent ?? ''
+    } catch (err) {
+      ipcLog.error(`Failed to extract text from ${fileName}:`, err)
+      extractedText = `[Text extraction failed for ${fileName}]`
+    }
+
+    const doc: import('../shared/types').ContextDocument = {
+      id: docId,
+      name: fileName,
+      type: ext as 'pdf' | 'docx',
+      size: fileBuffer.length,
+      extractedText,
+      addedAt: Date.now(),
+    }
+
+    const context = await getOrCreateContext(workspaceId)
+    context.documents.push(doc)
+    await saveContext(workspaceId, context)
+    ipcLog.info(`[Context] Added document: ${fileName} (${docId})`)
+    return context
+  })
+
+  ipcMain.handle(IPC_CHANNELS.CONTEXT_REMOVE_DOCUMENT, async (_event, workspaceId: string, documentId: string) => {
+    const workspace = getWorkspaceOrThrow(workspaceId)
+    const context = await getOrCreateContext(workspaceId)
+    const docIndex = context.documents.findIndex(d => d.id === documentId)
+
+    if (docIndex !== -1) {
+      const doc = context.documents[docIndex]
+      // Try to delete the stored file
+      const docsDir = join(workspace.rootPath, 'context', 'docs')
+      try {
+        const files = await readdir(docsDir)
+        const match = files.find(f => f.startsWith(documentId))
+        if (match) {
+          await unlink(join(docsDir, match))
+        }
+      } catch {
+        // File may already be gone
+      }
+      context.documents.splice(docIndex, 1)
+      await saveContext(workspaceId, context)
+      ipcLog.info(`[Context] Removed document: ${doc.name} (${documentId})`)
+    }
+
+    return context
+  })
+
 }

@@ -24,6 +24,7 @@ import {
   FolderOpen,
   HelpCircle,
   ExternalLink,
+  FlaskConical,
 } from "lucide-react"
 import { PanelRightRounded } from "../icons/PanelRightRounded"
 import { PanelLeftRounded } from "../icons/PanelLeftRounded"
@@ -101,12 +102,14 @@ import {
   isSourcesNavigation,
   isSettingsNavigation,
   isSkillsNavigation,
+  isTestCasesNavigation,
   type NavigationState,
   type ChatFilter,
 } from "@/contexts/NavigationContext"
 import type { SettingsSubpage } from "../../../shared/types"
 import { SourcesListPanel } from "./SourcesListPanel"
 import { SkillsListPanel } from "./SkillsListPanel"
+import { TestCasesNavigatorPanel } from "@/components/testcases/TestCasesNavigatorPanel"
 import { PanelHeader } from "./PanelHeader"
 import { EditPopover, getEditConfig, type EditContextKey } from "@/components/ui/EditPopover"
 import { getDocUrl } from "@craft-agent/shared/docs/doc-links"
@@ -1515,6 +1518,10 @@ function AppShellContent({
     navigate(routes.view.settings(subpage))
   }, [])
 
+  const handleTestCasesClick = useCallback(() => {
+    navigate(routes.view.testcases())
+  }, [])
+
   // ============================================================================
   // EDIT POPOVER STATE
   // ============================================================================
@@ -1711,13 +1718,14 @@ function AppShellContent({
     }
     flattenTree(labelTree)
 
-    // 3. Sources, Skills, Settings
+    // 3. Sources, Skills, Test Cases, Settings
     result.push({ id: 'nav:sources', type: 'nav', action: handleSourcesClick })
     result.push({ id: 'nav:skills', type: 'nav', action: handleSkillsClick })
+    result.push({ id: 'nav:testcases', type: 'nav', action: handleTestCasesClick })
     result.push({ id: 'nav:settings', type: 'nav', action: () => handleSettingsClick('app') })
 
     return result
-  }, [handleAllChatsClick, handleFlaggedClick, handleTodoStateClick, effectiveTodoStates, handleLabelClick, labelConfigs, labelTree, viewConfigs, handleViewClick, handleSourcesClick, handleSkillsClick, handleSettingsClick])
+  }, [handleAllChatsClick, handleFlaggedClick, handleTodoStateClick, effectiveTodoStates, handleLabelClick, labelConfigs, labelTree, viewConfigs, handleViewClick, handleSourcesClick, handleSkillsClick, handleTestCasesClick, handleSettingsClick])
 
   // Toggle folder expanded state
   const handleToggleFolder = React.useCallback((path: string) => {
@@ -1835,6 +1843,9 @@ function AppShellContent({
     if (isSkillsNavigation(navState)) {
       return 'All Skills'
     }
+
+    // Test Cases navigator
+    if (isTestCasesNavigation(navState)) return 'Test Cases'
 
     // Settings navigator
     if (isSettingsNavigation(navState)) return 'Settings'
@@ -2037,6 +2048,14 @@ function AppShellContent({
                       icon: <Flag className="h-3.5 w-3.5" />,
                       variant: chatFilter?.kind === 'flagged' ? "default" : "ghost",
                       onClick: handleFlaggedClick,
+                    },
+                    // --- Test Cases ---
+                    {
+                      id: "nav:testcases",
+                      title: "Test Cases",
+                      icon: <FlaskConical className="h-3.5 w-3.5" />,
+                      variant: isTestCasesNavigation(navState) ? "default" : "ghost",
+                      onClick: handleTestCasesClick,
                     },
                     // --- Separator ---
                     { id: "separator:chats-settings", type: "separator" },
@@ -2761,6 +2780,18 @@ function AppShellContent({
               <SettingsNavigator
                 selectedSubpage={navState.subpage}
                 onSelectSubpage={(subpage) => handleSettingsClick(subpage)}
+              />
+            )}
+            {isTestCasesNavigation(navState) && (
+              /* Test Cases Navigator - list of test generation sessions */
+              <TestCasesNavigatorPanel
+                selectedSessionId={isTestCasesNavigation(navState) && navState.details ? navState.details.sessionId : null}
+                onSelectSession={(sessionId: string) => {
+                  navigate(routes.view.testcases({ generationSessionId: sessionId }))
+                }}
+                onCreateSession={() => {
+                  // TODO: Create new testcase generation session
+                }}
               />
             )}
             {isChatsNavigation(navState) && (

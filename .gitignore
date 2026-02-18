@@ -1,9 +1,13 @@
+# Windows Zone.Identifier alternate data streams
+*:Zone.Identifier
+
 # dependencies (bun install)
 node_modules
 
 # output
 out
 dist
+apps/electron/src/main/wstg-full-content.json
 *.tgz
 .build
 apps/electron/release

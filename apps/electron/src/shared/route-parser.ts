@@ -15,6 +15,7 @@ import type {
   SourceFilter,
   SettingsSubpage,
   RightSidebarPanel,
+  TestCaseViewMode,
 } from './types'
 
 // =============================================================================
@@ -34,7 +35,7 @@ export interface ParsedRoute {
 // Compound Route Types (new format)
 // =============================================================================
 
-export type NavigatorType = 'chats' | 'sources' | 'skills' | 'settings'
+export type NavigatorType = 'chats' | 'sources' | 'skills' | 'settings' | 'testcases'
 
 export interface ParsedCompoundRoute {
   /** The navigator type */
@@ -58,7 +59,7 @@ export interface ParsedCompoundRoute {
  * Known prefixes that indicate a compound route
  */
 const COMPOUND_ROUTE_PREFIXES = [
-  'allChats', 'flagged', 'state', 'label', 'view', 'sources', 'skills', 'settings'
+  'allChats', 'flagged', 'state', 'label', 'view', 'sources', 'skills', 'settings', 'testcases'
 ]
 
 /**
@@ -149,6 +150,30 @@ export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
       return {
         navigator: 'skills',
         details: { type: 'skill', id: segments[2] },
+      }
+    }
+
+    return null
+  }
+
+  // Test cases navigator
+  if (first === 'testcases') {
+    if (segments.length === 1) {
+      return { navigator: 'testcases', details: null }
+    }
+
+    // testcases/session/{sessionId}
+    if (segments[1] === 'session' && segments[2]) {
+      // testcases/session/{sessionId}/case/{testCaseId}
+      if (segments[3] === 'case' && segments[4]) {
+        return {
+          navigator: 'testcases',
+          details: { type: 'testcase', id: `${segments[2]}/${segments[4]}` },
+        }
+      }
+      return {
+        navigator: 'testcases',
+        details: { type: 'testcase-session', id: segments[2] },
       }
     }
 
@@ -345,6 +370,18 @@ function convertCompoundToViewRoute(compound: ParsedCompoundRoute): ParsedRoute 
     return { type: 'view', name: 'skill-info', id: compound.details.id, params: {} }
   }
 
+  // Test cases
+  if (compound.navigator === 'testcases') {
+    if (!compound.details) {
+      return { type: 'view', name: 'testcases', params: {} }
+    }
+    if (compound.details.type === 'testcase') {
+      // id is "sessionId/testCaseId"
+      return { type: 'view', name: 'testcase-detail', id: compound.details.id, params: {} }
+    }
+    return { type: 'view', name: 'testcase-session', id: compound.details.id, params: {} }
+  }
+
   // Chats
   if (compound.chatFilter) {
     const filter = compound.chatFilter
@@ -459,6 +496,26 @@ function convertCompoundToNavigationState(compound: ParsedCompoundRoute): Naviga
     return {
       navigator: 'skills',
       details: { type: 'skill', skillSlug: compound.details.id },
+    }
+  }
+
+  // Test cases
+  if (compound.navigator === 'testcases') {
+    if (!compound.details) {
+      return { navigator: 'testcases', details: null }
+    }
+    if (compound.details.type === 'testcase') {
+      // id is "sessionId/testCaseId"
+      const [sessionId, testCaseId] = compound.details.id.split('/')
+      return {
+        navigator: 'testcases',
+        details: { type: 'testcase', sessionId, testCaseId, viewMode: 'report' as TestCaseViewMode },
+      }
+    }
+    // testcase-session type
+    return {
+      navigator: 'testcases',
+      details: { type: 'testcase', sessionId: compound.details.id, viewMode: 'grid' as TestCaseViewMode },
     }
   }
 
@@ -616,6 +673,16 @@ export function buildRouteFromNavigationState(state: NavigationState): string {
       return `skills/skill/${state.details.skillSlug}`
     }
     return 'skills'
+  }
+
+  if (state.navigator === 'testcases') {
+    if (state.details) {
+      if (state.details.testCaseId) {
+        return `testcases/session/${state.details.sessionId}/case/${state.details.testCaseId}`
+      }
+      return `testcases/session/${state.details.sessionId}`
+    }
+    return 'testcases'
   }
 
   // Chats
