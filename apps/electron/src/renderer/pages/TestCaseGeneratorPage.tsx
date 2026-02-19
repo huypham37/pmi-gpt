@@ -41,6 +41,7 @@ export function TestCaseGeneratorPage({
   const addTestCase = useSetAtom(addTestCaseAtom);
   const loadAllTestCases = useSetAtom(loadAllTestCasesAtom);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const effectiveSessionId = sessionId ?? generationSessionId ?? MOCK_SESSION_ID_VALUE;
   const testCaseIds = useAtomValue(allTestCaseIdsAtom);
@@ -69,6 +70,7 @@ export function TestCaseGeneratorPage({
 
     setIsGenerating(true);
     setInputValue('');
+    setErrorMessage(null);
 
     try {
       // Call the main process to run RAG + ACP generation
@@ -88,6 +90,7 @@ export function TestCaseGeneratorPage({
       }
     } catch (error) {
       console.error('[TestCaseGen] Generation failed:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Generation failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -141,6 +144,13 @@ export function TestCaseGeneratorPage({
             <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground border-b border-border/50">
               <Loader2 className="w-4 h-4 animate-spin" />
               Generating test cases...
+            </div>
+          )}
+
+          {/* Error message */}
+          {errorMessage && (
+            <div className="px-4 py-2 text-sm text-destructive border-b border-border/50">
+              {errorMessage}
             </div>
           )}
 

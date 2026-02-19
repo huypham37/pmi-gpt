@@ -1,7 +1,16 @@
-import { describe, it, expect } from 'bun:test'
+import { describe, it, expect, beforeAll } from 'bun:test'
+import { join } from 'path'
+import { setBundledAssetsRoot } from '@craft-agent/shared/utils'
 import { buildAugmentedPrompt, parseSelectedEntries, parseSelectedId, type WSTGSelection } from '../wstg-prompt'
+import { buildWSTGListPrompt } from '../wstg-selection-prompt'
 import { WSTG_ENTRIES, type WSTGEntry } from '../wstg-data'
 import wstgFullContent from '../wstg-full-content.json'
+import wstgThinContent from '../wstg-thin-content.json'
+
+beforeAll(() => {
+  // Point to packages/shared so getBundledAssetsDir('prompts') resolves correctly
+  setBundledAssetsRoot(join(__dirname, '..', '..', '..', '..', '..', 'packages', 'shared'))
+})
 
 // ============================================================================
 // Fixtures
@@ -386,6 +395,69 @@ describe('buildAugmentedPrompt with project context', () => {
     const prompt = buildAugmentedPrompt('CSRF attack', SELECTION_NULL, ctx)
     // The generic fallback doesn't include project context — verify this behavior
     expect(prompt).toContain('CSRF attack')
+  })
+})
+
+// ============================================================================
+// buildWSTGListPrompt — uses thin content for first-pass selection
+// ============================================================================
+
+describe('buildWSTGListPrompt', () => {
+  it('includes the attack vector in the prompt', () => {
+    const prompt = buildWSTGListPrompt('SQL injection in login form')
+    expect(prompt).toContain('SQL injection in login form')
+  })
+
+  it('includes WSTG IDs from thin content', () => {
+    const prompt = buildWSTGListPrompt('XSS attack')
+    for (const id of Object.keys(wstgThinContent)) {
+      expect(prompt).toContain(id)
+    }
+  })
+
+  it('uses titles from thin content, not descriptions from wstg-data.ts', () => {
+    const prompt = buildWSTGListPrompt('XSS attack')
+    // Thin title for WSTG-INFO-01 (from first line of thin file)
+    expect(prompt).toContain('Conduct Search Engine Discovery Reconnaissance for Information Leakage')
+    // wstg-data.ts description should NOT appear (it has different phrasing with raw text)
+    const infoEntry = WSTG_ENTRIES.find(e => e.id === 'WSTG-INFO-01')!
+    expect(prompt).not.toContain(infoEntry.description)
+  })
+
+  it('does not include full markdown content from wstg-full-content.json', () => {
+    const prompt = buildWSTGListPrompt('CSRF')
+    // Full content has section headers like "## How to Test" — should not be in selection prompt
+    expect(prompt).not.toContain('## How to Test')
+    expect(prompt).not.toContain('## Summary')
+  })
+})
+
+// ============================================================================
+// wstg-thin-content.json integrity
+// ============================================================================
+
+describe('wstg-thin-content.json', () => {
+  it('contains 108 entries', () => {
+    expect(Object.keys(wstgThinContent).length).toBe(108)
+  })
+
+  it('all keys follow WSTG-XXXX-NN format', () => {
+    for (const key of Object.keys(wstgThinContent)) {
+      expect(key).toMatch(/^WSTG-[A-Z]+-\d+$/)
+    }
+  })
+
+  it('every entry has non-empty content', () => {
+    for (const [, content] of Object.entries(wstgThinContent)) {
+      expect((content as string).length).toBeGreaterThan(0)
+    }
+  })
+
+  it('every WSTG_ENTRIES ID has a matching key in wstg-thin-content.json', () => {
+    const thinKeys = new Set(Object.keys(wstgThinContent))
+    for (const entry of WSTG_ENTRIES) {
+      expect(thinKeys.has(entry.id)).toBe(true)
+    }
   })
 })
 

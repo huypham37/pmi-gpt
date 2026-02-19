@@ -2359,6 +2359,10 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
       documents: contextDocuments,
     })
 
+    const charCount = augmentedPrompt.length
+    const estimatedTokens = Math.ceil(charCount / 4)
+    ipcLog.info(`[TestCaseGen] Augmented prompt: ${charCount} chars, ~${estimatedTokens} tokens`)
+
     // Step 3: Create ACP session and send prompt to OpenCode
     const session = await sessionManager.createSession(workspaceId, {
       profile: 'testcase',
