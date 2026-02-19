@@ -36,7 +36,7 @@ async function getOrLoadModel(client: LMStudioClient, modelIdentifier?: string) 
     try {
       const contextLength = getModelContextWindow(resolvedModel)
       sessionLog.info(`[LMStudio] Auto-loading: path=${path}, contextLength=${contextLength ?? 'default (not set in models.ts)'}`)
-      const loaded = await client.llm.load(path, { config: { context_length: contextLength } as any })
+      const loaded = await client.llm.load(path, { config: { contextLength } })
       sessionLog.info(`[LMStudio] Auto-load success: identifier=${loaded.identifier}, contextLength=${contextLength}`)
       return loaded
     } catch (loadError) {
@@ -88,8 +88,9 @@ export async function selectRelevantWSTGEntries(
       const configuredModel = getModel() ?? DEFAULT_MODEL
       const path = configuredModel.replace(/^lmstudio\//, '')
       const contextLength = getModelContextWindow(configuredModel)
-      await client.llm.load(path, { config: { context_length: contextLength } as any })
-      sessionLog.info(`[LMStudio] Reloaded: path=${path}, context_length=${contextLength}`)
+      const reloaded = await client.llm.load(path, { config: { contextLength } })
+      const actualCtx = await reloaded.getContextLength()
+      sessionLog.info(`[LMStudio] Reloaded: path=${path}, requested=${contextLength}, actual=${actualCtx}`)
     } catch (reloadErr) {
       sessionLog.warn(`[LMStudio] Failed to reload model (non-fatal): ${reloadErr}`)
     }
