@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'bun:test'
 import { join } from 'path'
-import { setBundledAssetsRoot } from '@craft-agent/shared/utils'
+import { setBundledAssetsRoot } from '@pmi-agent/shared/utils'
 import { buildAugmentedPrompt, parseSelectedEntries, parseSelectedId, type WSTGSelection } from '../wstg-prompt'
 import { buildWSTGListPrompt } from '../wstg-selection-prompt'
 import { WSTG_ENTRIES, type WSTGEntry } from '../wstg-data'

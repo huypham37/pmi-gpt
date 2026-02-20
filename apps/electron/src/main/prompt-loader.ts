@@ -10,7 +10,7 @@
 
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { getBundledAssetsDir } from '@craft-agent/shared/utils'
+import { getBundledAssetsDir } from '@pmi-agent/shared/utils'
 
 /** Cache of loaded prompt content keyed by filename. */
 const _cache = new Map<string, string>()

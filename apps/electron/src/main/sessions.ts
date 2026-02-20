@@ -3,9 +3,9 @@ import * as Sentry from '@sentry/electron/main'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { rm, readFile, mkdir } from 'fs/promises'
-import { type PermissionMode, type AuthRequest, type AuthResult, type CredentialAuthRequest } from '@craft-agent/shared/agent'
-import { ACPClient, ACPSession, PermissionRequest as ACPPermissionRequest, type SessionUpdate, type ToolCall as ACPToolCall } from '@craft-agent/acp-client'
-import { ClientCapabilitiesPresets } from '@craft-agent/acp-client'
+import { type PermissionMode, type AuthRequest, type AuthResult, type CredentialAuthRequest } from '@pmi-agent/shared/agent'
+import { ACPClient, ACPSession, PermissionRequest as ACPPermissionRequest, type SessionUpdate, type ToolCall as ACPToolCall } from '@pmi-agent/acp-client'
+import { ClientCapabilitiesPresets } from '@pmi-agent/acp-client'
 import { sessionLog, isDebugMode, getLogFilePath } from './logger'
 import type { WindowManager } from './window-manager'
 import {
@@ -14,8 +14,8 @@ import {
   getWorkspaceByNameOrId,
   loadConfigDefaults,
   type Workspace,
-} from '@craft-agent/shared/config'
-import { loadWorkspaceConfig } from '@craft-agent/shared/workspaces'
+} from '@pmi-agent/shared/config'
+import { loadWorkspaceConfig } from '@pmi-agent/shared/workspaces'
 import {
   // Session persistence functions
   listSessions as listStoredSessions,
@@ -37,23 +37,23 @@ import {
   type TodoState,
   type AgentProfile,
   profileToMode,
-} from '@craft-agent/shared/sessions'
-import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, SERVER_BUILD_ERRORS } from '@craft-agent/shared/sources'
-import { ConfigWatcher, type ConfigWatcherCallbacks } from '@craft-agent/shared/config'
-import { getAuthState } from '@craft-agent/shared/auth'
+} from '@pmi-agent/shared/sessions'
+import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, SERVER_BUILD_ERRORS } from '@pmi-agent/shared/sources'
+import { ConfigWatcher, type ConfigWatcherCallbacks } from '@pmi-agent/shared/config'
+import { getAuthState } from '@pmi-agent/shared/auth'
 // ACP replaces the SDK agent - these are no longer needed:
-// import { setAnthropicOptionsEnv, setPathToClaudeCodeExecutable, setInterceptorPath, setExecutable } from '@craft-agent/shared/agent'
-import { getCredentialManager } from '@craft-agent/shared/credentials'
-import { CraftMcpClient } from '@craft-agent/shared/mcp'
+// import { setAnthropicOptionsEnv, setPathToClaudeCodeExecutable, setInterceptorPath, setExecutable } from '@pmi-agent/shared/agent'
+import { getCredentialManager } from '@pmi-agent/shared/credentials'
+import { CraftMcpClient } from '@pmi-agent/shared/mcp'
 import { type Session, type Message, type SessionEvent, type FileAttachment, type StoredAttachment, type SendMessageOptions, IPC_CHANNELS, generateMessageId } from '../shared/types'
-import { generateSessionTitle, regenerateSessionTitle, formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrl, getEmojiIcon, resetSummarizationClient, resolveToolIcon } from '@craft-agent/shared/utils'
-import { loadWorkspaceSkills, type LoadedSkill } from '@craft-agent/shared/skills'
-import type { ToolDisplayMeta } from '@craft-agent/core/types'
-import { DEFAULT_MODEL, getToolIconsDir, getMode, getModel } from '@craft-agent/shared/config'
-import { type ThinkingLevel, DEFAULT_THINKING_LEVEL } from '@craft-agent/shared/agent/thinking-levels'
-import { evaluateAutoLabels } from '@craft-agent/shared/labels/auto'
-import { listLabels } from '@craft-agent/shared/labels/storage'
-import { extractLabelId } from '@craft-agent/shared/labels'
+import { generateSessionTitle, regenerateSessionTitle, formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrl, getEmojiIcon, resetSummarizationClient, resolveToolIcon } from '@pmi-agent/shared/utils'
+import { loadWorkspaceSkills, type LoadedSkill } from '@pmi-agent/shared/skills'
+import type { ToolDisplayMeta } from '@pmi-agent/core/types'
+import { DEFAULT_MODEL, getToolIconsDir, getMode, getModel } from '@pmi-agent/shared/config'
+import { type ThinkingLevel, DEFAULT_THINKING_LEVEL } from '@pmi-agent/shared/agent/thinking-levels'
+import { evaluateAutoLabels } from '@pmi-agent/shared/labels/auto'
+import { listLabels } from '@pmi-agent/shared/labels/storage'
+import { extractLabelId } from '@pmi-agent/shared/labels'
 
 /**
  * Sanitize message content for use as session title.
@@ -220,7 +220,7 @@ function resolveToolDisplayMeta(
 
   // CLI tool icon resolution for Bash commands
   // Parses the command string to detect known tools (git, npm, docker, etc.)
-  // and resolves their brand icon from ~/.craft-agent/tool-icons/
+  // and resolves their brand icon from ~/.pmi-agent/tool-icons/
   if (toolName === 'Bash' && toolInput?.command) {
     const toolIconsDir = getToolIconsDir()
     const match = resolveToolIcon(String(toolInput.command), toolIconsDir)
@@ -275,7 +275,7 @@ interface ManagedSession {
   // Used to detect if a follow-up message has superseded the current one (stale-request guard).
   processingGeneration: number
   // NOTE: Parent-child tracking state (pendingTools, parentToolStack, toolToParentMap,
-  // pendingTextParent) has been removed. CraftAgent now provides parentToolUseId
+  // pendingTextParent) has been removed. PmiAgent now provides parentToolUseId
   // directly on all events using the SDK's authoritative parent_tool_use_id field.
   // See: packages/shared/src/agent/tool-matching.ts
   // Session name (user-defined or AI-generated)
@@ -579,7 +579,7 @@ export class SessionManager {
       onSkillChange: async (slug, skill) => {
         sessionLog.info(`Skill '${slug}' changed:`, skill ? 'updated' : 'deleted')
         // Broadcast updated list to UI
-        const { loadWorkspaceSkills } = await import('@craft-agent/shared/skills')
+        const { loadWorkspaceSkills } = await import('@pmi-agent/shared/skills')
         const skills = loadWorkspaceSkills(workspaceRootPath)
         this.broadcastSkillsChanged(skills)
       },
@@ -670,7 +670,7 @@ export class SessionManager {
   /**
    * Broadcast app theme changed event to all windows
    */
-  private broadcastAppThemeChanged(theme: import('@craft-agent/shared/config').ThemeOverrides | null): void {
+  private broadcastAppThemeChanged(theme: import('@pmi-agent/shared/config').ThemeOverrides | null): void {
     if (!this.windowManager) return
     sessionLog.info(`Broadcasting app theme changed`)
     this.windowManager.broadcastToAll(IPC_CHANNELS.THEME_APP_CHANGED, theme)
@@ -679,7 +679,7 @@ export class SessionManager {
   /**
    * Broadcast skills changed event to all windows
    */
-  private broadcastSkillsChanged(skills: import('@craft-agent/shared/skills').LoadedSkill[]): void {
+  private broadcastSkillsChanged(skills: import('@pmi-agent/shared/skills').LoadedSkill[]): void {
     if (!this.windowManager) return
     sessionLog.info(`Broadcasting skills changed (${skills.length} skills)`)
     this.windowManager.broadcastToAll(IPC_CHANNELS.SKILLS_CHANGED, skills)
@@ -687,7 +687,7 @@ export class SessionManager {
 
   /**
    * Broadcast default permissions changed event to all windows
-   * Triggered when ~/.craft-agent/permissions/default.json changes
+   * Triggered when ~/.pmi-agent/permissions/default.json changes
    */
   private broadcastDefaultPermissionsChanged(): void {
     if (!this.windowManager) return
@@ -713,7 +713,7 @@ export class SessionManager {
    * Bun's automatic .env loading is disabled in the subprocess (--env-file=/dev/null)
    * to prevent a user's project .env from injecting ANTHROPIC_API_KEY and overriding
    * OAuth auth — Claude Code prioritizes API key over OAuth token when both are set.
-   * See: https://github.com/lukilabs/craft-agents-oss/issues/39
+   * See: https://github.com/lukilabs/pmi-agents-oss/issues/39
    */
   async reinitializeAuth(): Promise<void> {
     try {
@@ -797,8 +797,8 @@ export class SessionManager {
       arguments: ['acp'],
       workingDirectory: defaultCwd,
       clientInfo: {
-        name: 'craft-agent',
-        title: 'Craft Agents',
+        name: 'pmi-agent',
+        title: 'PMI Agent',
         version: app.getVersion(),
       },
       capabilities: ClientCapabilitiesPresets.full,
@@ -1185,7 +1185,7 @@ export class SessionManager {
       }
 
       // Update source config to mark as authenticated
-      const { markSourceAuthenticated } = await import('@craft-agent/shared/sources')
+      const { markSourceAuthenticated } = await import('@pmi-agent/shared/sources')
       markSourceAuthenticated(managed.workspace.rootPath, request.sourceSlug)
 
       // ACP: Source guide management handled by server
@@ -1605,7 +1605,7 @@ export class SessionManager {
         return { success: false, error: 'Session file not found' }
       }
 
-      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const { VIEWER_URL } = await import('@pmi-agent/shared/branding')
       const response = await fetch(`${VIEWER_URL}/s/api`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1669,7 +1669,7 @@ export class SessionManager {
         return { success: false, error: 'Session file not found' }
       }
 
-      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const { VIEWER_URL } = await import('@pmi-agent/shared/branding')
       const response = await fetch(`${VIEWER_URL}/s/api/${managed.sharedId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1714,7 +1714,7 @@ export class SessionManager {
     this.sendEvent({ type: 'async_operation', sessionId, isOngoing: true }, managed.workspace.id)
 
     try {
-      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const { VIEWER_URL } = await import('@pmi-agent/shared/branding')
       const response = await fetch(
         `${VIEWER_URL}/s/api/${managed.sharedId}`,
         { method: 'DELETE' }
@@ -2248,7 +2248,7 @@ export class SessionManager {
       sendSpan.mark('chat.starting')
 
       // Build content blocks: text message + attachment content
-      const contentBlocks: import('@craft-agent/acp-client').ContentBlock[] = [{ type: 'text', text: message }]
+      const contentBlocks: import('@pmi-agent/acp-client').ContentBlock[] = [{ type: 'text', text: message }]
       for (const att of storedAttachments ?? []) {
         if (att.type === 'image') {
           // Use resizedBase64 if available (already in memory), otherwise read from disk
@@ -2750,7 +2750,7 @@ To view this task's output:
 
   /**
    * Process an ACP SessionUpdate event and map it to IPC events for the renderer.
-   * This replaces the old processEvent() which handled CraftAgent AgentEvent types.
+   * This replaces the old processEvent() which handled PmiAgent AgentEvent types.
    *
    * ACP SessionUpdate types → IPC SessionEvent mapping:
    * - text → text_delta (streaming) + text_complete (on next update or stream end)

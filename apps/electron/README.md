@@ -1,6 +1,6 @@
-# Craft Agents Electron App
+# PMI Agent Electron App
 
-The primary desktop interface for Craft Agents, built with Electron + React. Provides a multi-session inbox with chat interface for interacting with Claude via Craft workspaces.
+The primary desktop interface for PMI Agent, built with Electron + React. Provides a multi-session inbox with chat interface for interacting with Claude via Craft workspaces.
 
 ## Quick Start
 
@@ -248,14 +248,14 @@ navigate(routes.sidebar.flagged())        // Show flagged
 
 ### Deep Links
 
-External apps can navigate using `craftagents://` URLs:
+External apps can navigate using `pmiagent://` URLs:
 
 ```
-craftagents://settings
-craftagents://allChats/chat/session123
-craftagents://sources/source/github
-craftagents://action/new-chat
-craftagents://workspace/{id}/allChats/chat/abc123
+pmiagent://settings
+pmiagent://allChats/chat/session123
+pmiagent://sources/source/github
+pmiagent://action/new-chat
+pmiagent://workspace/{id}/allChats/chat/abc123
 ```
 
 See `CLAUDE.md` for complete route reference.

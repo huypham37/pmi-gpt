@@ -40,8 +40,8 @@ import { toast } from 'sonner'
 import { useMenuComponents, type MenuComponents } from '@/components/ui/menu-context'
 import { getStateColor, getStateIcon, type TodoStateId } from '@/config/todo-states'
 import type { TodoState } from '@/config/todo-states'
-import type { LabelConfig } from '@craft-agent/shared/labels'
-import { extractLabelId } from '@craft-agent/shared/labels'
+import type { LabelConfig } from '@pmi-agent/shared/labels'
+import { extractLabelId } from '@pmi-agent/shared/labels'
 import { LabelIcon } from '@/components/ui/label-icon'
 
 export interface SessionMenuProps {

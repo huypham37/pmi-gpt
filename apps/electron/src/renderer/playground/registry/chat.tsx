@@ -2,7 +2,7 @@ import * as React from 'react'
 import type { ComponentEntry } from './types'
 import { AttachmentPreview } from '@/components/app-shell/AttachmentPreview'
 import { SetupAuthBanner } from '@/components/app-shell/SetupAuthBanner'
-import { TurnCard, type ActivityItem } from '@craft-agent/ui'
+import { TurnCard, type ActivityItem } from '@pmi-agent/ui'
 import type { BackgroundTask } from '@/components/app-shell/ActiveTasksBar'
 import { ActiveOptionBadges } from '@/components/app-shell/ActiveOptionBadges'
 import { InputContainer } from '@/components/app-shell/input'
@@ -491,7 +491,7 @@ function ActiveTasksBarContext({ tasks = sampleBackgroundTasks }: ActiveTasksBar
 
         {/* Real InputContainer */}
         <InputContainer
-          placeholder="Message Craft Agent..."
+          placeholder="Message PMI Agent..."
           disabled={false}
           isProcessing={false}
           permissionMode={permissionMode}
@@ -500,7 +500,7 @@ function ActiveTasksBarContext({ tasks = sampleBackgroundTasks }: ActiveTasksBar
           onUltrathinkChange={setUltrathinkEnabled}
           sources={mockSources}
           enabledSourceSlugs={['github-api', 'local-files']}
-          workingDirectory="/Users/demo/projects/craft-agent"
+          workingDirectory="/Users/demo/projects/pmi-agent"
           sessionId="playground-session"
           onSubmit={mockInputCallbacks.onSubmit}
 
@@ -598,7 +598,7 @@ function PermissionInputToggle({ autoToggle = false, autoToggleInterval = 3000, 
 
       {/* Real InputContainer - handles animation automatically */}
       <InputContainer
-        placeholder="Message Craft Agent..."
+        placeholder="Message PMI Agent..."
         disabled={false}
         isProcessing={false}
         permissionMode={permissionMode}
@@ -607,7 +607,7 @@ function PermissionInputToggle({ autoToggle = false, autoToggleInterval = 3000, 
         onUltrathinkChange={setUltrathinkEnabled}
         sources={mockSources}
         enabledSourceSlugs={['github-api', 'local-files']}
-        workingDirectory="/Users/demo/projects/craft-agent"
+        workingDirectory="/Users/demo/projects/pmi-agent"
         sessionId="playground-session"
         structuredInput={structuredInput}
         onStructuredResponse={handlePermissionResponse}
@@ -938,7 +938,7 @@ export const chatComponents: ComponentEntry[] = [
         name: 'placeholder',
         description: 'Textarea placeholder text',
         control: { type: 'string', placeholder: 'Message...' },
-        defaultValue: 'Message Craft Agent...',
+        defaultValue: 'Message PMI Agent...',
       },
 
       {
@@ -964,7 +964,7 @@ export const chatComponents: ComponentEntry[] = [
         name: 'workingDirectory',
         description: 'Current working directory',
         control: { type: 'string', placeholder: '/path/to/project' },
-        defaultValue: '/Users/demo/projects/craft-agent',
+        defaultValue: '/Users/demo/projects/pmi-agent',
       },
     ],
     mockData: () => {

@@ -13,7 +13,7 @@ import type { AppShellContextType } from '@/context/AppShellContext'
 import { OnboardingWizard, ReauthScreen } from '@/components/onboarding'
 import { ResetConfirmationDialog } from '@/components/ResetConfirmationDialog'
 import { SplashScreen } from '@/components/SplashScreen'
-import { TooltipProvider } from '@craft-agent/ui'
+import { TooltipProvider } from '@pmi-agent/ui'
 import { FocusProvider } from '@/context/FocusContext'
 import { ModalProvider } from '@/context/ModalContext'
 import { useGlobalShortcuts } from '@/hooks/keyboard'
@@ -51,7 +51,7 @@ import {
   CodePreviewOverlay,
   DocumentFormattedMarkdownOverlay,
   JSONPreviewOverlay,
-} from '@craft-agent/ui'
+} from '@pmi-agent/ui'
 import { useLinkInterceptor, type FilePreviewState } from '@/hooks/useLinkInterceptor'
 
 type AppState = 'loading' | 'onboarding' | 'reauth' | 'ready'
@@ -317,7 +317,7 @@ export default function App() {
     const initialize = async () => {
       try {
         console.log('[RENDERER-DEBUG] Init useEffect: calling ensureDefaultWorkspace...')
-        // Ensure default workspace exists (creates ~/.craft-agent/workspaces/default/ on first launch)
+        // Ensure default workspace exists (creates ~/.pmi-agent/workspaces/default/ on first launch)
         const workspace = await window.electronAPI.ensureDefaultWorkspace()
         console.log(`[RENDERER-DEBUG] Init useEffect: ensureDefaultWorkspace returned workspace id=${workspace?.id}`)
 
@@ -1280,7 +1280,7 @@ export default function App() {
     openNewChat,
   ])
 
-  // Platform actions for @craft-agent/ui components (overlays, etc.)
+  // Platform actions for @pmi-agent/ui components (overlays, etc.)
   // Memoized to prevent re-renders when these callbacks don't change
   // NOTE: Must be defined before early returns to maintain consistent hook order
   const platformActions = useMemo(() => ({

@@ -1,4 +1,4 @@
-export * from './craft-agent.ts';
+export * from './pmi-agent.ts';
 export * from './errors.ts';
 export * from './options.ts';
 
@@ -88,7 +88,7 @@ export {
   loadSourcePermissionsConfig,
   getWorkspacePermissionsPath,
   getSourcePermissionsPath,
-  // App-level default permissions (at ~/.craft-agent/permissions/)
+  // App-level default permissions (at ~/.pmi-agent/permissions/)
   getAppPermissionsDir,
   ensureDefaultPermissions,
   loadDefaultPermissions,

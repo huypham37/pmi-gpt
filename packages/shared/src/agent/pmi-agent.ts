@@ -3,7 +3,7 @@ import { getDefaultOptions, resetClaudeConfigCheck } from './options.ts';
 import type { ContentBlockParam } from '@anthropic-ai/sdk/resources';
 import { z } from 'zod';
 import { getSystemPrompt, getDateTimeContext, getWorkingDirectoryContext } from '../prompts/system.ts';
-// Plan types are used by UI components; not needed in craft-agent.ts since Safe Mode is user-controlled
+// Plan types are used by UI components; not needed in pmi-agent.ts since Safe Mode is user-controlled
 import { parseError, type AgentError } from './errors.ts';
 import { runErrorDiagnostics } from './diagnostics.ts';
 import { loadConfigDefaults, type Workspace } from '../config/storage.ts';
@@ -64,10 +64,10 @@ export {
   PERMISSION_MODE_ORDER,
   PERMISSION_MODE_CONFIG,
 } from './mode-manager.ts';
-// Documentation is served via local files at ~/.craft-agent/docs/
+// Documentation is served via local files at ~/.pmi-agent/docs/
 
 // Import and re-export AgentEvent from core (single source of truth)
-import type { AgentEvent } from '@craft-agent/core/types';
+import type { AgentEvent } from '@pmi-agent/core/types';
 export type { AgentEvent };
 
 // Stateless tool matching — pure functions for SDK message → AgentEvent conversion
@@ -828,7 +828,7 @@ export class CraftAgent {
         ? {
             // Mini agents need session tools (config_validate) and docs for reference
             session: getSessionScopedTools(sessionId, this.workspaceRootPath),
-            'craft-agents-docs': {
+            'pmi-agents-docs': {
               type: 'http',
               url: 'https://agents.craft.do/docs/mcp',
             },
@@ -837,9 +837,9 @@ export class CraftAgent {
             preferences: getPreferencesServer(false),
             // Session-scoped tools (SubmitPlan, source_test, etc.)
             session: getSessionScopedTools(sessionId, this.workspaceRootPath),
-            // Craft Agents documentation - always available for searching setup guides
+            // PMI Agent documentation - always available for searching setup guides
             // This is a public Mintlify MCP server, no auth needed
-            'craft-agents-docs': {
+            'pmi-agents-docs': {
               type: 'http',
               url: 'https://agents.craft.do/docs/mcp',
             },
@@ -882,7 +882,7 @@ export class CraftAgent {
         debug('[CraftAgent] Mini agent optimizations:', {
           model,
           tools: ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'Bash'],
-          mcpServers: ['session', 'craft-agents-docs'],
+          mcpServers: ['session', 'pmi-agents-docs'],
           thinking: 'disabled',
           systemPrompt: 'lean (no Claude Code preset)',
         });
@@ -1044,8 +1044,8 @@ export class CraftAgent {
                   // Built-in MCP servers that are always available (not user sources)
                   // - preferences: user preferences storage
                   // - session: session-scoped tools (SubmitPlan, source_test, etc.)
-                  // - craft-agents-docs: always-available documentation search
-                  const builtInMcpServers = new Set(['preferences', 'session', 'craft-agents-docs']);
+                  // - pmi-agents-docs: always-available documentation search
+                  const builtInMcpServers = new Set(['preferences', 'session', 'pmi-agents-docs']);
 
                   // Check if this is a source server (not built-in)
                   if (!builtInMcpServers.has(serverName)) {

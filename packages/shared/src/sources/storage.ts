@@ -295,7 +295,7 @@ export { isIconUrl } from '../utils/icon.ts';
 
 /**
  * Load complete source with all files
- * @param workspaceRootPath - Absolute path to workspace folder (e.g., ~/.craft-agent/workspaces/xxx)
+ * @param workspaceRootPath - Absolute path to workspace folder (e.g., ~/.pmi-agent/workspaces/xxx)
  * @param sourceSlug - Source folder name
  */
 export function loadSource(workspaceRootPath: string, sourceSlug: string): LoadedSource | null {
@@ -355,7 +355,7 @@ export function getEnabledSources(workspaceRootPath: string): LoadedSource[] {
 /**
  * Get sources by slugs for a workspace.
  * Includes both user-configured sources from disk and builtin sources
- * (like craft-agents-docs) that don't have filesystem folders.
+ * (like pmi-agents-docs) that don't have filesystem folders.
  */
 export function getSourcesBySlugs(workspaceRootPath: string, slugs: string[]): LoadedSource[] {
   const workspaceId = basename(workspaceRootPath);
@@ -363,8 +363,8 @@ export function getSourcesBySlugs(workspaceRootPath: string, slugs: string[]): L
   for (const slug of slugs) {
     // Check builtin sources first (they don't exist on disk)
     if (isBuiltinSource(slug)) {
-      // Currently only craft-agents-docs is a builtin source
-      if (slug === 'craft-agents-docs') {
+      // Currently only pmi-agents-docs is a builtin source
+      if (slug === 'pmi-agents-docs') {
         sources.push(getDocsSource(workspaceId, workspaceRootPath));
       }
       continue;
@@ -380,7 +380,7 @@ export function getSourcesBySlugs(workspaceRootPath: string, slugs: string[]): L
 
 /**
  * Load all sources for a workspace INCLUDING built-in sources.
- * Built-in sources (like craft-agents-docs) are always available and merged
+ * Built-in sources (like pmi-agents-docs) are always available and merged
  * with user-configured sources from the workspace.
  *
  * Use this when the agent needs visibility into all available sources,
@@ -517,7 +517,7 @@ export async function createSource(
   }
 
   // Create guide.md with skeleton template
-  // (bundled guides removed - agent should search craft-agents-docs MCP for service-specific guidance)
+  // (bundled guides removed - agent should search pmi-agents-docs MCP for service-specific guidance)
   const guideContent = `# ${input.name}
 
 ## Guidelines

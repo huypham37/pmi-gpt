@@ -14,7 +14,7 @@
  * Together these eliminate the need for FIFO matching, parent stacks, and orphan recovery.
  */
 
-import type { AgentEvent } from '@craft-agent/core/types';
+import type { AgentEvent } from '@pmi-agent/core/types';
 
 // ============================================================================
 // Tool Index — append-only, order-independent lookup

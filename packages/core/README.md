@@ -1,19 +1,19 @@
-# @craft-agent/core
+# @pmi-agent/core
 
-Shared TypeScript types and utilities for Craft Agent applications.
+Shared TypeScript types and utilities for PMI Agent applications.
 
 ## Installation
 
 ```bash
 # In a workspace package
-bun add @craft-agent/core
+bun add @pmi-agent/core
 ```
 
 Or add to `package.json`:
 ```json
 {
   "dependencies": {
-    "@craft-agent/core": "workspace:*"
+    "@pmi-agent/core": "workspace:*"
   }
 }
 ```
@@ -28,10 +28,10 @@ import type {
   Message,
   TokenUsage,
   AgentEvent,
-} from '@craft-agent/core';
+} from '@pmi-agent/core';
 
 // Import utilities
-import { generateMessageId, debug } from '@craft-agent/core';
+import { generateMessageId, debug } from '@pmi-agent/core';
 ```
 
 ## Exported Types

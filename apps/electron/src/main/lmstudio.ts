@@ -12,8 +12,8 @@ import { sessionLog } from './logger'
 import { parseSelectedEntries } from './wstg-prompt'
 import { buildWSTGListPrompt } from './wstg-selection-prompt'
 import { loadPrompt } from './prompt-loader'
-import { DEFAULT_MODEL, getModelContextWindow } from '@craft-agent/shared/config/models'
-import { getModel } from '@craft-agent/shared/config'
+import { DEFAULT_MODEL, getModelContextWindow } from '@pmi-agent/shared/config/models'
+import { getModel } from '@pmi-agent/shared/config'
 
 export { buildAugmentedPrompt, parseSelectedEntries, type WSTGSelection } from './wstg-prompt'
 

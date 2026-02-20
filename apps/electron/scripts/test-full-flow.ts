@@ -18,7 +18,7 @@
  */
 
 import { LMStudioClient, Chat } from '@lmstudio/sdk'
-import { ACPClient, ClientCapabilitiesPresets } from '@craft-agent/acp-client'
+import { ACPClient, ClientCapabilitiesPresets } from '@pmi-agent/acp-client'
 import { WSTG_ENTRIES, type WSTGEntry } from '../src/main/wstg-data'
 import { parseSelectedEntries, buildAugmentedPrompt } from '../src/main/wstg-prompt'
 import { parseTestCasesFromResponse, toTestCases } from '../src/shared/testcase-parser'

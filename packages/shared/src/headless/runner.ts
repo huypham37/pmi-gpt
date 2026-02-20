@@ -1,4 +1,4 @@
-import { CraftAgent, type CraftAgentConfig, type PermissionMode, type SdkMcpServerConfig } from '../agent/craft-agent.ts';
+import { CraftAgent, type CraftAgentConfig, type PermissionMode, type SdkMcpServerConfig } from '../agent/pmi-agent.ts';
 import { createApiServer } from '../sources/api-tools.ts';
 import { listSessions, getOrCreateSessionById, updateSessionSdkId } from '../sessions/storage.ts';
 import { debug } from '../utils/debug.ts';

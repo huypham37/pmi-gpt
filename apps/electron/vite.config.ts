@@ -53,7 +53,7 @@ export default defineConfig({
       // Prompt template files — allows `import foo from '@prompts/name.md?raw'` in renderer
       '@prompts': resolve(__dirname, '../../packages/shared/assets/prompts'),
       // Force all React imports to use the root node_modules React
-      // Bun hoists deps to root. This prevents "multiple React copies" error from @craft-agent/ui
+      // Bun hoists deps to root. This prevents "multiple React copies" error from @pmi-agent/ui
       'react': resolve(__dirname, '../../node_modules/react'),
       'react-dom': resolve(__dirname, '../../node_modules/react-dom'),
     },
@@ -95,7 +95,7 @@ export default defineConfig({
       'date-fns',
       'react-day-picker',
     ],
-    exclude: ['@craft-agent/ui'],
+    exclude: ['@pmi-agent/ui'],
     esbuildOptions: {
       supported: { 'top-level-await': true },
       target: 'esnext'

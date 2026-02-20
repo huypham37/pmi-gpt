@@ -5,11 +5,11 @@
  * Uses recursive directory watching for simplicity and reliability.
  *
  * Watched paths:
- * - ~/.craft-agent/config.json - Main app configuration
- * - ~/.craft-agent/preferences.json - User preferences
- * - ~/.craft-agent/theme.json - App-level theme overrides
- * - ~/.craft-agent/themes/*.json - Preset theme files (app-level)
- * - ~/.craft-agent/workspaces/{slug}/ - Workspace directory (recursive)
+ * - ~/.pmi-agent/config.json - Main app configuration
+ * - ~/.pmi-agent/preferences.json - User preferences
+ * - ~/.pmi-agent/theme.json - App-level theme overrides
+ * - ~/.pmi-agent/themes/*.json - Preset theme files (app-level)
+ * - ~/.pmi-agent/workspaces/{slug}/ - Workspace directory (recursive)
  *   - sources/{slug}/config.json, guide.md, permissions.json
  *   - skills/{slug}/SKILL.md, icon.*
  *   - permissions.json
@@ -18,33 +18,33 @@
 import { watch, existsSync, readdirSync, statSync, readFileSync, mkdirSync } from 'fs';
 import { join, dirname, basename, relative } from 'path';
 import type { FSWatcher } from 'fs';
-import { debug, perf } from '@craft-agent/shared/utils';
-import { loadStoredConfig, CONFIG_DIR, type StoredConfig } from '@craft-agent/shared/config';
+import { debug, perf } from '@pmi-agent/shared/utils';
+import { loadStoredConfig, CONFIG_DIR, type StoredConfig } from '@pmi-agent/shared/config';
 import {
   validateConfig,
   validatePreferences,
   validateSource,
   type ValidationResult,
-} from '@craft-agent/shared/config';
-import type { LoadedSource, SourceGuide } from '@craft-agent/shared/sources';
+} from '@pmi-agent/shared/config';
+import type { LoadedSource, SourceGuide } from '@pmi-agent/shared/sources';
 import {
   loadSource,
   loadWorkspaceSources,
   loadSourceGuide,
   sourceNeedsIconDownload,
   downloadSourceIcon,
-} from '@craft-agent/shared/sources';
-import { permissionsConfigCache, getAppPermissionsDir } from '@craft-agent/shared/agent';
-import { getWorkspacePath, getWorkspaceSourcesPath, getWorkspaceSkillsPath } from '@craft-agent/shared/workspaces';
-import type { LoadedSkill } from '@craft-agent/shared/skills';
-import { loadSkill, loadWorkspaceSkills, skillNeedsIconDownload, downloadSkillIcon } from '@craft-agent/shared/skills';
+} from '@pmi-agent/shared/sources';
+import { permissionsConfigCache, getAppPermissionsDir } from '@pmi-agent/shared/agent';
+import { getWorkspacePath, getWorkspaceSourcesPath, getWorkspaceSkillsPath } from '@pmi-agent/shared/workspaces';
+import type { LoadedSkill } from '@pmi-agent/shared/skills';
+import { loadSkill, loadWorkspaceSkills, skillNeedsIconDownload, downloadSkillIcon } from '@pmi-agent/shared/skills';
 import {
   loadStatusConfig,
   statusNeedsIconDownload,
   downloadStatusIcon,
-} from '@craft-agent/shared/statuses';
-import { loadAppTheme, loadPresetThemes, loadPresetTheme, getAppThemesDir } from '@craft-agent/shared/config';
-import type { ThemeOverrides, PresetTheme } from '@craft-agent/shared/config';
+} from '@pmi-agent/shared/statuses';
+import { loadAppTheme, loadPresetThemes, loadPresetTheme, getAppThemesDir } from '@pmi-agent/shared/config';
+import type { ThemeOverrides, PresetTheme } from '@pmi-agent/shared/config';
 
 // ============================================================
 // Constants
@@ -100,7 +100,7 @@ export interface ConfigWatcherCallbacks {
   onSkillsListChange?: (skills: LoadedSkill[]) => void;
 
   // Permissions callbacks
-  /** Called when app-level default permissions change (~/.craft-agent/permissions/default.json) */
+  /** Called when app-level default permissions change (~/.pmi-agent/permissions/default.json) */
   onDefaultPermissionsChange?: () => void;
   /** Called when workspace permissions.json changes */
   onWorkspacePermissionsChange?: (workspaceId: string) => void;
@@ -860,7 +860,7 @@ export class ConfigWatcher {
   }
 
   /**
-   * Watch app-level themes directory (~/.craft-agent/themes/)
+   * Watch app-level themes directory (~/.pmi-agent/themes/)
    */
   private watchAppThemesDir(): void {
     const themesDir = getAppThemesDir();
@@ -889,7 +889,7 @@ export class ConfigWatcher {
   }
 
   /**
-   * Watch app-level permissions directory (~/.craft-agent/permissions/)
+   * Watch app-level permissions directory (~/.pmi-agent/permissions/)
    * Watches for changes to default.json which contains the default read-only patterns
    */
   private watchAppPermissionsDir(): void {

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import type { ComponentEntry } from './types'
 import { cn } from '@/lib/utils'
-import type { PermissionMode } from '@craft-agent/shared/agent/modes'
+import type { PermissionMode } from '@pmi-agent/shared/agent/modes'
 
 // Import REAL components from the main app
 import { FreeFormInput } from '@/components/app-shell/input/FreeFormInput'

@@ -17,9 +17,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { HeaderMenu } from '@/components/ui/HeaderMenu'
 import { routes } from '@/lib/navigate'
-import { Spinner } from '@craft-agent/ui'
+import { Spinner } from '@pmi-agent/ui'
 import type { DetailsPageMeta } from '@/lib/navigation-registry'
-import { MODELS, DEFAULT_MODEL } from '@craft-agent/shared/config/models'
+import { MODELS, DEFAULT_MODEL } from '@pmi-agent/shared/config/models'
 
 import {
   SettingsSection,

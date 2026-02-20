@@ -1,12 +1,92 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>favicon</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="100%" height="100%" style="image-rendering: pixelated; shape-rendering: crispEdges;">
     <defs>
-        <path d="M0,0 L24,0 L24,24 L0,24 L0,0 Z" id="path-1"></path>
-    </defs>
-    <g id="favicon" stroke="none" fill="none" xlink:href="#path-1" fill-rule="evenodd" stroke-width="1">
-        <g id="Group" transform="translate(3.4502, 3)" fill="#9570BE">
-            <path d="M3.17890888,3.6 L3.17890888,0 L16,0 L16,3.6 L3.17890888,3.6 Z M9.642,7.2 L9.64218223,10.8 L0,10.8 L0,3.6 L16,3.6 L16,7.2 L9.642,7.2 Z M3.17890888,18 L3.178,14.4 L0,14.4 L0,10.8 L16,10.8 L16,18 L3.17890888,18 Z" id="Combined-Shape" fill-rule="nonzero"></path>
+        <!-- Pixel-perfect stair-stepped path for a 32x32 rounded application icon -->
+        <clipPath id="appClip">
+            <path d="M 6 0 H 26 V 1 H 28 V 2 H 29 V 3 H 30 V 4 H 31 V 6 H 32 V 26 H 31 V 28 H 30 V 29 H 29 V 30 H 28 V 31 H 26 V 32 H 6 V 31 H 4 V 30 H 3 V 29 H 2 V 28 H 1 V 26 H 0 V 6 H 1 V 4 H 2 V 3 H 3 V 2 H 4 V 1 H 6 V 0 Z" />
+        </clipPath>
+
+        <!-- 8-bit Retro Scanline Pattern -->
+        <pattern id="scanline" width="1" height="2" patternUnits="userSpaceOnUse">
+            <rect width="32" height="1" fill="#000000" opacity="0.15" />
+        </pattern>
+
+        <!-- The "PMI" text mapped onto a strict 32x32 pixel grid -->
+        <g id="pmi">
+            <!-- Letter P (Width 5, x: 6 to 10) -->
+            <rect x="6" y="11" width="2" height="10" />
+            <rect x="8" y="11" width="2" height="2" />
+            <rect x="8" y="15" width="2" height="2" />
+            <rect x="10" y="12" width="1" height="4" />
+
+            <!-- Letter M (Width 7, x: 13 to 19) -->
+            <rect x="13" y="11" width="2" height="10" />
+            <rect x="18" y="11" width="2" height="10" />
+            <rect x="15" y="12" width="1" height="2" />
+            <rect x="16" y="13" width="1" height="2" />
+            <rect x="17" y="12" width="1" height="2" />
+
+            <!-- Letter I (Width 4, x: 22 to 25) -->
+            <rect x="22" y="11" width="4" height="2" />
+            <rect x="23" y="13" width="2" height="6" />
+            <rect x="22" y="19" width="4" height="2" />
         </g>
+    </defs>
+
+    <!-- App Icon Base & Background (Dark Gray) -->
+    <g clip-path="url(#appClip)">
+        <!-- Chunky retro gradient stripes -->
+        <rect y="0" width="32" height="8" fill="#383C45" />
+        <rect y="8" width="32" height="8" fill="#2E3138" />
+        <rect y="16" width="32" height="8" fill="#24262C" />
+        <rect y="24" width="32" height="8" fill="#1A1C20" />
+
+        <!-- Overlay Scanlines -->
+        <rect width="32" height="32" fill="url(#scanline)" />
+
+        <!-- Pixelated Gloss / Glass Reflection -->
+        <path d="M 0 0 H 32 V 8 H 28 V 10 H 24 V 12 H 16 V 14 H 8 V 16 H 0 Z" fill="#FFFFFF" opacity="0.06" />
+
+        <!-- Inner top highlight & bottom shadow for button depth -->
+        <rect x="6" y="0" width="20" height="1" fill="#555A66" opacity="0.6" />
+        <rect x="6" y="31" width="20" height="1" fill="#000000" opacity="0.6" />
+    </g>
+
+    <!-- 1. Deep Outline & Drop Shadow layer -->
+    <g fill="#0B0D12">
+        <!-- Top and Sides -->
+        <use href="#pmi" x="-1" y="-1" />
+        <use href="#pmi" x="0" y="-1" />
+        <use href="#pmi" x="1" y="-1" />
+        <use href="#pmi" x="-1" y="0" />
+        <use href="#pmi" x="1" y="0" />
+        <use href="#pmi" x="-1" y="1" />
+        <use href="#pmi" x="1" y="1" />
+        <use href="#pmi" x="-1" y="2" />
+        <use href="#pmi" x="1" y="2" />
+        <!-- Extended Bottom Shadow -->
+        <use href="#pmi" x="-1" y="3" />
+        <use href="#pmi" x="0" y="3" />
+        <use href="#pmi" x="1" y="3" />
+    </g>
+
+    <!-- 2. Mid-layer for 3D Block Extrusion (Darker Blue) -->
+    <g fill="#003B99">
+        <use href="#pmi" x="0" y="1" />
+        <use href="#pmi" x="0" y="2" />
+    </g>
+
+    <!-- 3. Main Text Face Layer (Requested #0866FF Blue) -->
+    <use href="#pmi" x="0" y="0" fill="#0866FF" />
+
+    <!-- 4. Hand-placed Pixel Highlights on the text for pop -->
+    <g fill="#7AB3FF">
+        <!-- P highlights -->
+        <rect x="6" y="11" width="1" height="2" />
+        <rect x="7" y="11" width="2" height="1" />
+        <!-- M highlights -->
+        <rect x="13" y="11" width="2" height="1" />
+        <rect x="18" y="11" width="2" height="1" />
+        <!-- I highlights -->
+        <rect x="22" y="11" width="4" height="1" />
     </g>
 </svg>

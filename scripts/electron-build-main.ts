@@ -118,6 +118,20 @@ async function main(): Promise<void> {
     mkdirSync(DIST_DIR, { recursive: true });
   }
 
+  // Build workspace dependency: @pmi-agent/acp-client
+  console.log("📦 Building @pmi-agent/acp-client...");
+  const acpBuild = spawn({
+    cmd: ["bun", "run", "build"],
+    cwd: join(ROOT_DIR, "packages/acp-client"),
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const acpExitCode = await acpBuild.exited;
+  if (acpExitCode !== 0) {
+    console.error("❌ acp-client build failed with exit code", acpExitCode);
+    process.exit(acpExitCode);
+  }
+
   const buildDefines = getBuildDefines();
 
   console.log("🔨 Building main process...");

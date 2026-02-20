@@ -1,12 +1,12 @@
-interface CraftAgentsLogoProps {
+interface PmiAgentLogoProps {
   className?: string
 }
 
 /**
- * Craft Agents pixel art logo - uses accent color from theme
+ * PMI Agent pixel art logo - uses accent color from theme
  * Apply text-accent class to get the brand purple color
  */
-export function CraftAgentsLogo({ className }: CraftAgentsLogoProps) {
+export function PmiAgentLogo({ className }: PmiAgentLogoProps) {
   return (
     <svg
       viewBox="0 0 408 66"
