@@ -47,9 +47,7 @@ export function parseSingleTestCase(block: string): ParsedTestCase | null {
   const guidanceTable = extractTable(block, 'Guidance')
   const referenceTable = extractTable(block, 'Reference')
 
-  const guidance = guidanceTable
-    ? formatGuidanceRows(parseMarkdownTable(guidanceTable))
-    : undefined
+  const guidance = guidanceTable ?? undefined
 
   const reference = referenceTable
     ? parseReferenceTable(parseMarkdownTable(referenceTable))
@@ -193,31 +191,7 @@ function parseTableRow(line: string): string[] {
   return trimmed.split('|').map((cell) => cell.trim())
 }
 
-/**
- * Format guidance table rows into a readable markdown string
- * for storage in the `guidance` field.
- */
-function formatGuidanceRows(rows: Record<string, string>[]): string | undefined {
-  if (rows.length === 0) return undefined
 
-  const lines: string[] = []
-  for (const row of rows) {
-    const step = row['step'] ?? ''
-    const expected = row['expected-result'] ?? row['expected result'] ?? ''
-    const example = row['example'] ?? ''
-
-    const parts: string[] = []
-    if (step) parts.push(step)
-    if (expected) parts.push(`Expected: ${expected}`)
-    if (example) parts.push(`Example: ${example}`)
-
-    if (parts.length > 0) {
-      lines.push(parts.join('\n   '))
-    }
-  }
-
-  return lines.length > 0 ? lines.join('\n') : undefined
-}
 
 /**
  * Parse reference table rows into Reference objects.

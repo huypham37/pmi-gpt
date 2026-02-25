@@ -14,6 +14,7 @@ import {
   ListOrdered,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Markdown } from '@/components/markdown'
 import { testCaseAtomFamily } from '@/atoms/testcases'
 import type { TestCase } from '../../../shared/types'
 
@@ -116,8 +117,8 @@ function ReportContent({ testCase }: { testCase: TestCase }) {
       {testCase.guidance && (
         <div>
           <SectionHeader title="Guidance" icon={ListOrdered} />
-          <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap rounded-lg border border-border bg-blue-500/5 p-3">
-            {testCase.guidance}
+          <div className="text-sm text-foreground/80 leading-relaxed rounded-lg border border-border p-3">
+            <Markdown>{testCase.guidance}</Markdown>
           </div>
         </div>
       )}
