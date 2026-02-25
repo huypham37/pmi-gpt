@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Plus,
-  FolderOpen,
   FileText,
   FileUp,
   Trash2,
-  Save,
   Loader2,
-  ChevronDown,
-  ChevronRight,
+  Maximize2,
 } from 'lucide-react';
 import { useAppShellContext } from '@/context/AppShellContext';
+import { Markdown } from '@/components/markdown';
+import { DescriptionEditorOverlay } from './DescriptionEditorOverlay';
 import type { ProjectContext } from '../../../shared/types';
 
 interface TestCasesNavigatorPanelProps {
@@ -34,10 +33,8 @@ function ProjectContextSection() {
   const [context, setContext] = useState<ProjectContext | null>(null);
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [isAddingDoc, setIsAddingDoc] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   // Load context on mount
   useEffect(() => {
@@ -53,28 +50,21 @@ function ProjectContextSection() {
       .catch(() => setIsLoading(false));
   }, [activeWorkspaceId]);
 
-  const handleDescriptionChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setDescription(e.target.value);
-      setIsDirty(true);
-    },
-    [],
-  );
-
-  const handleSave = useCallback(async () => {
-    if (!activeWorkspaceId || !isDirty) return;
-    setIsSaving(true);
+  const handleEditorClose = useCallback(async (updatedValue: string) => {
+    setIsEditorOpen(false);
+    if (!activeWorkspaceId || updatedValue === description) return;
+    setDescription(updatedValue);
     try {
       const updated = await window.electronAPI.saveProjectContextDescription(
         activeWorkspaceId,
-        description,
+        updatedValue,
       );
       setContext(updated);
-      setIsDirty(false);
-    } finally {
-      setIsSaving(false);
+    } catch {
+      // revert on failure
+      setDescription(description);
     }
-  }, [activeWorkspaceId, description, isDirty]);
+  }, [activeWorkspaceId, description]);
 
   const handleAddDocument = useCallback(async () => {
     if (!activeWorkspaceId) return;
@@ -113,59 +103,43 @@ function ProjectContextSection() {
 
   return (
     <div className="flex flex-col shrink-0">
-      {/* Section header — collapsible */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-2 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
-      >
-        {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+      <div className="px-3 py-3 space-y-3">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          </div>
         ) : (
-          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-        )}
-        <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-        <span className="text-sm font-semibold text-foreground">Project Context</span>
-        {!expanded && docCount > 0 && (
-          <span className="text-[10px] text-muted-foreground ml-auto">
-            {docCount} doc{docCount !== 1 ? 's' : ''}
-          </span>
-        )}
-      </button>
-
-      {expanded && (
-        <div className="px-3 pb-3 space-y-3">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              {/* Description textarea */}
+          <>
+            {/* Description preview + fullscreen editor */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[11px] font-medium text-muted-foreground">Description</span>
-                  {isDirty && (
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
-                    >
-                      {isSaving ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Save className="w-3 h-3" />
-                      )}
-                      Save
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setIsEditorOpen(true)}
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                    Edit
+                  </button>
                 </div>
-                <textarea
-                  value={description}
-                  onChange={handleDescriptionChange}
-                  onBlur={handleSave}
-                  placeholder="Tech stack, architecture, auth, endpoints…"
-                  rows={3}
-                  className="w-full px-2.5 py-2 rounded-md border border-border bg-muted/30 text-xs text-foreground placeholder:text-muted-foreground/50 resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+                <button
+                  onClick={() => setIsEditorOpen(true)}
+                  className="w-full text-left px-2.5 py-2 rounded-md border border-border bg-muted/30 cursor-pointer hover:border-muted-foreground/40 transition-colors"
+                >
+                  {description ? (
+                    <div className="text-xs text-foreground line-clamp-3 overflow-hidden">
+                      <Markdown mode="minimal">{description}</Markdown>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground/50">
+                      Click to add project description…
+                    </span>
+                  )}
+                </button>
+                <DescriptionEditorOverlay
+                  isOpen={isEditorOpen}
+                  onClose={handleEditorClose}
+                  initialValue={description}
                 />
               </div>
 
@@ -229,7 +203,6 @@ function ProjectContextSection() {
             </>
           )}
         </div>
-      )}
     </div>
   );
 }

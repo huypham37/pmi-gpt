@@ -1845,7 +1845,7 @@ function AppShellContent({
     }
 
     // Test Cases navigator
-    if (isTestCasesNavigation(navState)) return 'Test Cases'
+    if (isTestCasesNavigation(navState)) return 'Project Description'
 
     // Settings navigator
     if (isSettingsNavigation(navState)) return 'Settings'
