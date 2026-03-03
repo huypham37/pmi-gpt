@@ -44,7 +44,7 @@ export function parseSingleTestCase(block: string): ParsedTestCase | null {
   const targetComponent = extractField(block, 'Target Component')
   const description = extractField(block, 'Description')
   const preconditions = extractField(block, 'Preconditions')
-  const guidanceTable = extractTable(block, 'Guidance')
+  const guidanceTable = extractTable(block, 'Guidance') ?? extractOrphanStepsTable(block)
   const referenceTable = extractTable(block, 'Reference')
 
   const guidance = guidanceTable ?? undefined
@@ -240,6 +240,20 @@ function splitIntoBlocks(text: string): string[] {
 
   // Single block
   return [text.trim()]
+}
+
+/**
+ * Fallback: find a steps table (with a `Step` column) that isn't preceded by
+ * a **Guidance:** header. The model often outputs the steps table directly
+ * after **Preconditions:** without a label.
+ */
+function extractOrphanStepsTable(text: string): string | undefined {
+  // Match a markdown table whose header row contains "Step" and is NOT
+  // preceded by **Guidance:**
+  const pattern = /(?<!\*\*Guidance\s*:\*\*[^\n]*\n)\n((?:\s*\|\s*Step\s*\|.+\|\s*\n)(?:\s*\|[\s\-:|]+\|\s*\n)(?:(?:\s*\|.+\|\s*\n?))+)/s
+  const match = text.match(pattern)
+  if (!match) return undefined
+  return match[1].trim() || undefined
 }
 
 function escapeRegex(str: string): string {
