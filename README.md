@@ -64,20 +64,31 @@ This checks for and installs: OpenCode, Python 3, Docling, and verifies build to
 <details>
 <summary><strong>1. Install Bun</strong></summary>
 
+**macOS/Linux:**
 ```bash
 curl -fsSL https://bun.sh/install | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+powershell -c "irm bun.sh/install.ps1 | iex"
 ```
 </details>
 
 <details>
 <summary><strong>2. Install OpenCode</strong></summary>
 
+**macOS/Linux:**
 ```bash
 curl -fsSL https://opencode.ai/install | bash
 ```
 
-Or via npm:
+**Windows (PowerShell):**
+```powershell
+powershell -c "irm https://opencode.ai/install.ps1 | iex"
+```
 
+Or via npm (all platforms):
 ```bash
 npm install -g opencode-ai
 ```
