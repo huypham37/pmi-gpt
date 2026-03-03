@@ -12,8 +12,8 @@ import { sessionLog } from './logger'
 import { parseSelectedEntries } from './wstg-prompt'
 import { buildWSTGListPrompt } from './wstg-selection-prompt'
 import { loadPrompt } from './prompt-loader'
-import { DEFAULT_MODEL, getModelContextWindow } from '@pmi-agent/shared/config/models'
-import { getModel } from '@pmi-agent/shared/config'
+import { DEFAULT_SUB_MODEL, getModelContextWindow } from '@pmi-agent/shared/config/models'
+import { getSubModel } from '@pmi-agent/shared/config'
 
 export { buildAugmentedPrompt, parseSelectedEntries, type WSTGSelection } from './wstg-prompt'
 
@@ -29,8 +29,8 @@ async function getOrLoadModel(client: LMStudioClient, modelIdentifier?: string) 
     return modelIdentifier ? await client.llm.model(modelIdentifier) : await client.llm.model()
   } catch (error) {
     if (!isNoModelError(error)) throw error
-    const configuredModel = getModel()
-    const resolvedModel = configuredModel ?? DEFAULT_MODEL
+    const configuredModel = getSubModel()
+    const resolvedModel = configuredModel ?? DEFAULT_SUB_MODEL
     const path = resolvedModel.replace(/^lmstudio\//, '')
     sessionLog.info(`[LMStudio] No model loaded. configuredModel=${configuredModel}, resolvedModel=${resolvedModel}, loadPath=${path}`)
     try {
@@ -67,6 +67,8 @@ export async function selectRelevantWSTGEntries(
     const client = new LMStudioClient()
     const model = await getOrLoadModel(client, modelIdentifier)
 
+    sessionLog.info(`[LMStudio] WSTG selection — model: ${model.identifier}, configured default: ${DEFAULT_SUB_MODEL}`)
+
     const chat = Chat.from([
       { role: 'system', content: loadPrompt('wstg-selection-system.md').trim() },
       { role: 'user', content: buildWSTGListPrompt(attackVector) },
@@ -85,7 +87,7 @@ export async function selectRelevantWSTGEntries(
       sessionLog.info(`[LMStudio] Unloading model...`)
       await model.unload()
       sessionLog.info(`[LMStudio] Model unloaded. Reloading with controlled context...`)
-      const configuredModel = getModel() ?? DEFAULT_MODEL
+      const configuredModel = getSubModel() ?? DEFAULT_SUB_MODEL
       const path = configuredModel.replace(/^lmstudio\//, '')
       const contextLength = getModelContextWindow(configuredModel)
       const reloaded = await client.llm.load(path, { config: { contextLength } })

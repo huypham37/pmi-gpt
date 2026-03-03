@@ -42,6 +42,7 @@ export interface StoredConfig {
   activeWorkspaceId: string | null;
   activeSessionId: string | null;
   model?: string;
+  subModel?: string;
   mode?: string;
   // Notifications
   notificationsEnabled?: boolean;
@@ -183,6 +184,18 @@ export function setModel(model: string): void {
   const config = loadStoredConfig();
   if (!config) return;
   config.model = model;
+  saveConfig(config);
+}
+
+export function getSubModel(): string | null {
+  const config = loadStoredConfig();
+  return config?.subModel ?? null;
+}
+
+export function setSubModel(subModel: string): void {
+  const config = loadStoredConfig();
+  if (!config) return;
+  config.subModel = subModel;
   saveConfig(config);
 }
 
