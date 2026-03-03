@@ -18,46 +18,6 @@ import {
 } from "./protocol/ACPTypes.js";
 import type { AgentInfo, AgentCapabilities, AIModel, AIMode } from "./protocol/ACPTypes.js";
 import { ACPSession } from "./ACPSession.js";
-import { execFileSync } from "node:child_process";
-import os from "node:os";
-
-function winToWslPath(winPath: string): string {
-  let p = winPath.replace(/\\/g, "/");
-  if (p.length >= 2 && p[1] === ":") {
-    const drive = p[0].toLowerCase();
-    p = `/mnt/${drive}${p.slice(2)}`;
-  }
-  return p;
-}
-
-function resolveWslOpencode(): string {
-  const wslBin = "wsl.exe";
-  try {
-    const result = execFileSync(wslBin, ["bash", "-ic", "which opencode 2>/dev/null"], {
-      encoding: "utf-8",
-      timeout: 10_000,
-    }).trim();
-    if (result && result.includes("/")) {
-      return result;
-    }
-  } catch {
-    // interactive shell failed, try known paths
-  }
-
-  const homeResult = execFileSync(wslBin, ["bash", "-c", "echo $HOME"], {
-    encoding: "utf-8",
-    timeout: 5_000,
-  }).trim();
-  const candidate = `${homeResult}/.opencode/bin/opencode`;
-  try {
-    execFileSync(wslBin, ["test", "-f", candidate], { timeout: 5_000 });
-    return candidate;
-  } catch {
-    throw new Error(
-      `opencode not found inside WSL. Install in WSL: curl -fsSL https://opencode.ai/install | bash`,
-    );
-  }
-}
 
 interface PendingRequest {
   resolve: (value: JSONValue) => void;
@@ -69,7 +29,6 @@ export class ACPClient {
   private readonly clientInfo: ClientInfo;
   private readonly clientCapabilities: ClientCapabilities;
   private readonly workingDirectory: string | undefined;
-  private readonly useWsl: boolean;
 
   agentInfo: AgentInfo | undefined;
   agentCapabilities: AgentCapabilities | undefined;
@@ -87,21 +46,9 @@ export class ACPClient {
     clientInfo: ClientInfo;
     capabilities?: ClientCapabilities;
   }) {
-    const isWindows = os.platform() === "win32";
-    this.useWsl = isWindows;
-
-    let executable: string;
-    let args: string[];
-    let workingDirectory = opts.workingDirectory;
-
-    if (isWindows) {
-      const wslOpencode = resolveWslOpencode();
-      executable = "wsl.exe";
-      args = [wslOpencode, ...(opts.arguments ?? ["acp"])];
-    } else {
-      executable = opts.executable;
-      args = opts.arguments ?? ["acp"];
-    }
+    const executable = opts.executable;
+    const args = opts.arguments ?? ["acp"];
+    const workingDirectory = opts.workingDirectory;
 
     this.transport = new StdioTransport({
       executable,
@@ -111,11 +58,7 @@ export class ACPClient {
     });
     this.clientInfo = opts.clientInfo;
     this.clientCapabilities = opts.capabilities ?? ClientCapabilitiesPresets.none;
-    if (isWindows && workingDirectory) {
-      this.workingDirectory = winToWslPath(workingDirectory);
-    } else {
-      this.workingDirectory = workingDirectory;
-    }
+    this.workingDirectory = workingDirectory;
   }
 
   async start(): Promise<void> {

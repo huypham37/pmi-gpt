@@ -39,38 +39,9 @@ def _win_to_wsl_path(win_path):
 def _get_opencode_cmd():
     """Return the command list to launch opencode acp.
 
-    On Windows, uses WSL to avoid native Windows ACP hang issues.
-    On Linux/macOS, finds the opencode binary directly.
-    Returns (cmd_list, cwd) tuple.
+    Uses the native opencode binary on all platforms (including Windows).
+    Returns (cmd_list, use_wsl=False) tuple.
     """
-    is_windows = platform.system() == "Windows"
-
-    if is_windows:
-        wsl_bin = shutil.which("wsl")
-        if not wsl_bin:
-            print("ERROR: WSL not found. opencode acp requires WSL on Windows.")
-            print("  Install WSL: https://learn.microsoft.com/en-us/windows/wsl/install")
-            sys.exit(1)
-        result = subprocess.run(
-            [wsl_bin, "bash", "-ic", "which opencode 2>/dev/null"],
-            capture_output=True, text=True, timeout=10,
-        )
-        wsl_opencode = result.stdout.strip()
-        if not wsl_opencode or "/" not in wsl_opencode:
-            wsl_user = subprocess.run(
-                [wsl_bin, "whoami"], capture_output=True, text=True, timeout=5,
-            ).stdout.strip()
-            wsl_opencode = f"/home/{wsl_user}/.opencode/bin/opencode"
-            check = subprocess.run(
-                [wsl_bin, "test", "-f", wsl_opencode],
-                capture_output=True, timeout=5,
-            )
-            if check.returncode != 0:
-                print("ERROR: opencode not found inside WSL")
-                print("  Install in WSL: curl -fsSL https://opencode.ai/install | bash")
-                sys.exit(1)
-        return [wsl_bin, wsl_opencode, "acp"], True
-
     found = shutil.which("opencode")
     if found:
         return [found, "acp"], False
@@ -81,6 +52,9 @@ def _get_opencode_cmd():
         os.path.join(home, ".bun", "bin", "opencode"),
         os.path.join(home, "node_modules", ".bin", "opencode"),
     ]
+    if platform.system() == "Windows":
+        candidates = [c + ".exe" if not c.endswith(".exe") else c for c in candidates]
+
     for path in candidates:
         if os.path.isfile(path):
             return [path, "acp"], False
