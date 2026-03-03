@@ -1472,6 +1472,7 @@ export class SessionManager {
 
       // Set model if session has a specific model override
       const resolvedModel = managed.model || config?.model || DEFAULT_MODEL
+      sessionLog.info(`[ACP Session] Setting main model — resolved: ${resolvedModel} (session: ${managed.model || 'none'}, config: ${config?.model || 'none'}, default: ${DEFAULT_MODEL})`)
       try {
         await managed.acpSession.setModel(resolvedModel)
       } catch (e) {
@@ -1480,6 +1481,7 @@ export class SessionManager {
 
       // Set mode from session profile (falls back to stored config, then 'testcase-generator')
       const resolvedMode = (managed.profile ? profileToMode(managed.profile) : null) || getMode() || 'testcase-generator'
+      sessionLog.info(`[ACP Session] Setting mode — resolved: ${resolvedMode} (profile: ${managed.profile || 'none'}, configMode: ${getMode() || 'none'}, fallback: testcase-generator)`)
       try {
         await managed.acpSession.setMode(resolvedMode)
       } catch (e) {

@@ -2374,11 +2374,23 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     // Step 4: Collect the full response from session messages
     const fullSession = await sessionManager.getSession(session.id)
     const assistantMessages = fullSession?.messages
-      .filter((m) => m.role === 'assistant')
-      .map((m) => m.content)
+      .filter((m) => m.type === 'assistant')
+      .map((m) => typeof m.content === 'string' ? m.content : JSON.stringify(m.content))
       .join('\n') ?? ''
 
     ipcLog.info(`[TestCaseGen] Received ${assistantMessages.length} chars from ACP`)
+
+    // Save raw model output for debugging
+    try {
+      const debugDir = join(process.cwd(), 'debug-output')
+      await mkdir(debugDir, { recursive: true })
+      const slug = attackVector.replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 60)
+      const debugPath = join(debugDir, `${Date.now()}-${slug}.md`)
+      await writeFile(debugPath, assistantMessages, 'utf-8')
+      ipcLog.info(`[TestCaseGen] Debug output saved to ${debugPath}`)
+    } catch (err) {
+      ipcLog.warn(`[TestCaseGen] Failed to save debug output: ${err}`)
+    }
 
     // Step 5: Parse markdown response into structured TestCase objects
     const parsed = parseTestCasesFromResponse(assistantMessages)

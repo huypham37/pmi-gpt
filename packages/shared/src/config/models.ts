@@ -21,14 +21,18 @@ export const MODELS: ModelDefinition[] = [
   { id: 'lmstudio/openai/gpt-oss-20b', name: 'GPT-OSS 20B', shortName: 'GPT-OSS 20B', description: 'Open-source GPT model via LM Studio' },
   { id: 'lmstudio/qwen3-coder-next', name: 'Qwen3 Coder Next', shortName: 'Qwen3 Coder', description: 'Coding-optimized Qwen model via LM Studio' },
   { id: 'lmstudio/qwen3-4b-mlx', name: 'Qwen3 4B Thinking', shortName: 'Qwen3 4B', description: 'Lightweight reasoning model via LM Studio', contextWindow: 50000 },
+  { id: 'lmstudio/qwen3.5-9b', name: 'Qwen3.5 9B', shortName: 'Qwen3.5 9B', description: 'Mid-size reasoning model via LM Studio' },
 ];
 
 // ============================================
 // PURPOSE-SPECIFIC DEFAULTS
 // ============================================
 
-/** Default model for main chat (user-facing) */
+/** Default main model for complex tasks (test case generation, chat) */
 export const DEFAULT_MODEL = 'lmstudio/qwen3-4b-mlx';
+
+/** Default sub-model for lightweight tasks (e.g., WSTG selection RAG) */
+export const DEFAULT_SUB_MODEL = 'lmstudio/qwen3.5-9b';
 
 /** Model for agent definition extraction (always high quality) */
 export const EXTRACTION_MODEL = 'github-copilot/gpt-5-mini';
