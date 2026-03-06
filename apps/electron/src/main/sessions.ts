@@ -791,11 +791,22 @@ export class SessionManager {
       sessionLog.info(`Created temp workspace directory: ${defaultCwd}`)
     }
     
+    // Resolve the bundled opencode config directory (agents, modes, plugins)
+    // In packaged app: lives in app resources as 'opencode-config'
+    // In development: use the repo's .opencode directory directly
+    const opencodeConfigDir = app.isPackaged
+      ? join(process.resourcesPath, 'opencode-config')
+      : join(__dirname, '..', '..', '..', '..', '.opencode')
+
     sessionLog.info(`[STARTUP-DEBUG] Creating ACPClient with cwd: ${defaultCwd}`)
+    sessionLog.info(`[STARTUP-DEBUG] OPENCODE_CONFIG_DIR: ${opencodeConfigDir}`)
     this.acpClient = new ACPClient({
       executable: opencodeExecutable,
       arguments: ['acp'],
       workingDirectory: defaultCwd,
+      environment: {
+        OPENCODE_CONFIG_DIR: opencodeConfigDir,
+      },
       clientInfo: {
         name: 'pmi-agent',
         title: 'PMI Agent',
