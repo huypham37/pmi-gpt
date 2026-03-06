@@ -2276,7 +2276,7 @@ export class SessionManager {
           if (text) contentBlocks.push({ type: 'resource', resource: { uri: `file://${att.storedPath}`, text } })
         }
       }
-      const updateStream = acpSession.prompt(contentBlocks.length > 1 ? contentBlocks : message)
+      const updateStream = acpSession.prompt(contentBlocks)
 
       for await (const update of updateStream) {
         // Process the ACP update
