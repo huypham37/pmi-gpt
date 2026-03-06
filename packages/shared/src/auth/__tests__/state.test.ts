@@ -48,7 +48,7 @@ function createMockCredentialManager(initialCreds?: {
 
 describe('getSetupNeeds', () => {
   describe('billing configuration', () => {
-    it('should need billing config when type is null', () => {
+    it('should always report billing as configured (OpenCode handles auth)', () => {
       const state: AuthState = {
         billing: {
           type: null,
@@ -61,17 +61,17 @@ describe('getSetupNeeds', () => {
 
       const needs = getSetupNeeds(state);
 
-      expect(needs.needsBillingConfig).toBe(true);
+      expect(needs.needsBillingConfig).toBe(false);
       expect(needs.needsCredentials).toBe(false);
-      expect(needs.isFullyConfigured).toBe(false);
+      expect(needs.isFullyConfigured).toBe(true);
     });
 
-    it('should not need billing config when type is set', () => {
+    it('should not need billing config when type is null (OpenCode manages auth)', () => {
       const state: AuthState = {
         billing: {
-          type: 'api_key',
+          type: null,
           hasCredentials: true,
-          apiKey: 'sk-test',
+          apiKey: null,
           claudeOAuthToken: null,
         },
         workspace: { hasWorkspace: false, active: null },
@@ -84,10 +84,10 @@ describe('getSetupNeeds', () => {
   });
 
   describe('credentials', () => {
-    it('should need credentials when type is set but hasCredentials is false', () => {
+    it('should never need credentials (OpenCode manages auth)', () => {
       const state: AuthState = {
         billing: {
-          type: 'oauth_token',
+          type: null,
           hasCredentials: false,
           apiKey: null,
           claudeOAuthToken: null,
@@ -98,14 +98,14 @@ describe('getSetupNeeds', () => {
       const needs = getSetupNeeds(state);
 
       expect(needs.needsBillingConfig).toBe(false);
-      expect(needs.needsCredentials).toBe(true);
-      expect(needs.isFullyConfigured).toBe(false);
+      expect(needs.needsCredentials).toBe(false);
+      expect(needs.isFullyConfigured).toBe(true);
     });
 
-    it('should not need credentials when hasCredentials is true', () => {
+    it('should report fully configured regardless of hasCredentials', () => {
       const state: AuthState = {
         billing: {
-          type: 'oauth_token',
+          type: null,
           hasCredentials: true,
           apiKey: null,
           claudeOAuthToken: 'valid-token',
@@ -129,7 +129,7 @@ describe('getSetupNeeds', () => {
 
       const state: AuthState = {
         billing: {
-          type: 'oauth_token',
+          type: null,
           hasCredentials: false,
           apiKey: null,
           claudeOAuthToken: null,
@@ -147,10 +147,10 @@ describe('getSetupNeeds', () => {
     it('should not have migration info when not present in auth state', () => {
       const state: AuthState = {
         billing: {
-          type: 'oauth_token',
+          type: null,
           hasCredentials: true,
           apiKey: null,
-          claudeOAuthToken: 'valid-token',
+          claudeOAuthToken: null,
         },
         workspace: { hasWorkspace: false, active: null },
       };
@@ -162,12 +162,12 @@ describe('getSetupNeeds', () => {
   });
 
   describe('fully configured', () => {
-    it('should be fully configured when billing type and credentials are set', () => {
+    it('should always be fully configured (OpenCode handles auth)', () => {
       const state: AuthState = {
         billing: {
-          type: 'api_key',
+          type: null,
           hasCredentials: true,
-          apiKey: 'sk-test',
+          apiKey: null,
           claudeOAuthToken: null,
         },
         workspace: { hasWorkspace: true, active: null },
@@ -307,7 +307,7 @@ describe('migration info flow', () => {
     // 2. Build AuthState using the token result
     const authState: AuthState = {
       billing: {
-        type: 'oauth_token',
+        type: null,
         hasCredentials: false,
         apiKey: null,
         claudeOAuthToken: tokenResult.accessToken,
@@ -319,12 +319,12 @@ describe('migration info flow', () => {
     // 3. Derive setup needs
     const setupNeeds = getSetupNeeds(authState);
 
-    // 4. Migration info should be present throughout
+    // 4. Migration info should be present; OpenCode manages credentials so isFullyConfigured is always true
     expect(authState.billing.migrationRequired).toBeDefined();
     expect(setupNeeds.needsMigration).toBeDefined();
     expect(setupNeeds.needsMigration?.reason).toBe('legacy_token');
-    expect(setupNeeds.needsCredentials).toBe(true);
-    expect(setupNeeds.isFullyConfigured).toBe(false);
+    expect(setupNeeds.needsCredentials).toBe(false);
+    expect(setupNeeds.isFullyConfigured).toBe(true);
   });
 
   it('should not have migration info when token refresh succeeds', () => {
@@ -336,7 +336,7 @@ describe('migration info flow', () => {
     // 2. Build AuthState
     const authState: AuthState = {
       billing: {
-        type: 'oauth_token',
+        type: null,
         hasCredentials: true,
         apiKey: null,
         claudeOAuthToken: tokenResult.accessToken,

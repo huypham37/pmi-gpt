@@ -47,7 +47,7 @@ export function parseSingleTestCase(block: string): ParsedTestCase | null {
   const guidanceTable = extractTable(block, 'Guidance') ?? extractOrphanStepsTable(block)
   const referenceTable = extractTable(block, 'Reference')
 
-  const guidance = guidanceTable ?? undefined
+  const guidance = guidanceTable ? formatGuidanceTable(guidanceTable) : undefined
 
   const reference = referenceTable
     ? parseReferenceTable(parseMarkdownTable(referenceTable))
@@ -254,6 +254,26 @@ function extractOrphanStepsTable(text: string): string | undefined {
   const match = text.match(pattern)
   if (!match) return undefined
   return match[1].trim() || undefined
+}
+
+/**
+ * Convert a guidance markdown table string into human-readable lines.
+ * Each row becomes: "Step. Expected: <expected>[ Example: <example>]"
+ */
+function formatGuidanceTable(tableStr: string): string {
+  const rows = parseMarkdownTable(tableStr)
+  const lines: string[] = []
+  for (const row of rows) {
+    const step = row['step'] ?? ''
+    const expected = row['expected-result'] ?? row['expected_result'] ?? row['expected result'] ?? ''
+    const example = row['example'] ?? ''
+    if (!step) continue
+    let line = step
+    if (expected) line += ` Expected: ${expected}`
+    if (example) line += ` Example: ${example}`
+    lines.push(line)
+  }
+  return lines.join('\n')
 }
 
 function escapeRegex(str: string): string {
