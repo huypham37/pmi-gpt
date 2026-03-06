@@ -66,7 +66,7 @@ export function TestCaseGeneratorPage({
   }, [onOpenChat]);
 
   const handleSubmit = useCallback(async (message: string) => {
-    if (!message.trim() || isGenerating) return;
+    if (!message.trim() || isGenerating || !activeWorkspaceId) return;
 
     setIsGenerating(true);
     setInputValue('');

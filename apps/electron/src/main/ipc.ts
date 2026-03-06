@@ -2374,7 +2374,7 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     // Step 4: Collect the full response from session messages
     const fullSession = await sessionManager.getSession(session.id)
     const assistantMessages = fullSession?.messages
-      .filter((m) => m.type === 'assistant')
+      .filter((m) => m.role === 'assistant')
       .map((m) => typeof m.content === 'string' ? m.content : JSON.stringify(m.content))
       .join('\n') ?? ''
 

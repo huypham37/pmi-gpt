@@ -2015,7 +2015,7 @@ export class SessionManager {
         const wsConfig = loadWorkspaceConfig(managed.workspace.rootPath)
         const effectiveModel = model ?? wsConfig?.defaults?.model ?? loadStoredConfig()?.model ?? DEFAULT_MODEL
         const resolvedModel = effectiveModel
-        managed.acpSession.setModel(resolvedModel).catch(e => {
+        managed.acpSession.setModel(resolvedModel).catch((e: unknown) => {
           sessionLog.warn(`Failed to set model ${resolvedModel}:`, e)
         })
       }
@@ -2601,18 +2601,18 @@ To view this task's output:
       if (allowed) {
         // Prefer always_allow if alwaysAllow is true, otherwise allow_once
         const targetKind = alwaysAllow ? 'allow_always' : 'allow_once'
-        optionId = options.find(o => o.kind === targetKind)?.optionId
-          ?? options.find(o => o.kind === 'allow_once')?.optionId
+        optionId = options.find((o: { kind: string; optionId: string }) => o.kind === targetKind)?.optionId
+          ?? options.find((o: { kind: string; optionId: string }) => o.kind === 'allow_once')?.optionId
       } else {
-        optionId = options.find(o => o.kind === 'reject_once')?.optionId
-          ?? options.find(o => o.kind === 'reject_always')?.optionId
+        optionId = options.find((o: { kind: string; optionId: string }) => o.kind === 'reject_once')?.optionId
+          ?? options.find((o: { kind: string; optionId: string }) => o.kind === 'reject_always')?.optionId
       }
       if (optionId) {
-        permRequest.respond(optionId).catch(e => {
+        permRequest.respond(optionId).catch((e: unknown) => {
           sessionLog.warn('Failed to respond to ACP permission:', e)
         })
       } else {
-        permRequest.cancel().catch(e => {
+        permRequest.cancel().catch((e: unknown) => {
           sessionLog.warn('Failed to cancel ACP permission:', e)
         })
       }
@@ -2859,7 +2859,7 @@ To view this task's output:
 
       case 'plan': {
         // Render plan entries as a text message
-        const planText = update.entries.map(e => `- [${e.status}] ${e.content}`).join('\n')
+        const planText = update.entries.map((e: { status: string; content: string }) => `- [${e.status}] ${e.content}`).join('\n')
 
         // Flush any pending text first
         this.flushDelta(sessionId, workspaceId)
