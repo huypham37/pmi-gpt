@@ -151,7 +151,12 @@ try {
     Write-Host "Waiting for file handles to release..."
     Start-Sleep -Seconds 3
 } finally {
-    Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
+    # Resolve to long path first — $env:TEMP may return a Windows 8.3 short path
+    # (e.g. C:\Users\HUY~1.PHA\...) that Remove-Item cannot handle.
+    if (Test-Path $TempDir) {
+        $resolvedTemp = (Resolve-Path $TempDir).Path
+        Remove-Item -Recurse -Force $resolvedTemp -ErrorAction SilentlyContinue
+    }
 }
 
 # 4. Copy SDK from root node_modules (monorepo hoisting)
