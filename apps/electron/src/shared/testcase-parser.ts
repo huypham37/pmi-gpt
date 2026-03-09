@@ -134,9 +134,11 @@ function extractField(text: string, fieldName: string): string | undefined {
  * Returns the raw table string (header row + separator + data rows).
  */
 function extractTable(text: string, fieldName: string): string | undefined {
-  // Find the field header, then capture the table that follows
+  // Find the field header, then capture the table that follows.
+  // Use [^\S\n]* (whitespace except newlines) to avoid skipping over
+  // subsequent **Field:** headers when matching consecutive table rows.
   const pattern = new RegExp(
-    `\\*\\*${escapeRegex(fieldName)}\\s*:\\*\\*[^\\n]*\\n((?:\\s*\\|.+\\|\\s*\\n?)+)`,
+    `\\*\\*${escapeRegex(fieldName)}\\s*:\\*\\*[^\\n]*\\n((?:[^\\S\\n]*\\|.+\\|[^\\S\\n]*\\n?)+)`,
     's',
   )
   const match = text.match(pattern)

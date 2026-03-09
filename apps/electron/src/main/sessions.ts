@@ -1481,6 +1481,10 @@ export class SessionManager {
       // Create a new ACP session (the server owns tools/prompts/behavior)
       managed.acpSession = await this.acpClient.newSession()
 
+      // Log what OpenCode returned from session/new
+      sessionLog.info(`[ACP Session] Available modes: ${JSON.stringify(managed.acpSession.modes.map(m => m.id))}`)
+      sessionLog.info(`[ACP Session] Current mode after session/new: ${managed.acpSession.currentModeId ?? 'none'}`)
+
       // Set model if session has a specific model override
       const resolvedModel = managed.model || config?.model || DEFAULT_MODEL
       sessionLog.info(`[ACP Session] Setting main model — resolved: ${resolvedModel} (session: ${managed.model || 'none'}, config: ${config?.model || 'none'}, default: ${DEFAULT_MODEL})`)
@@ -1495,6 +1499,7 @@ export class SessionManager {
       sessionLog.info(`[ACP Session] Setting mode — resolved: ${resolvedMode} (profile: ${managed.profile || 'none'}, configMode: ${getMode() || 'none'}, fallback: testcase-generator)`)
       try {
         await managed.acpSession.setMode(resolvedMode)
+        sessionLog.info(`[ACP Session] Mode after setMode: ${managed.acpSession.currentModeId ?? 'none'}`)
       } catch (e) {
         sessionLog.warn(`Failed to set mode ${resolvedMode}:`, e)
       }

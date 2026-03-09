@@ -7,7 +7,7 @@
 
 import type { WSTGEntry } from './wstg-data'
 import wstgFullContent from './wstg-full-content.json'
-import { loadPrompt, renderTemplate } from './prompt-loader'
+// Instructions moved to agent layer: .opencode/agents/testcase-generator.md
 
 export interface WSTGSelection {
   primary: WSTGEntry | null
@@ -61,15 +61,11 @@ export function buildAugmentedPrompt(
     projectContextSection = '\n\n' + parts.join('\n\n')
   }
 
-  const instructions = renderTemplate(loadPrompt('wstg-testcase-instructions.md').trim(), { attackVector })
-
   return `Create detailed security test cases for the following attack vector: ${attackVector}
 
 Use the following OWASP WSTG entries as context:
 
-${primaryContext}${secondaryContext}${projectContextSection}
-
-${instructions}`
+${primaryContext}${secondaryContext}${projectContextSection}`
 }
 
 export interface ParsedSelection {
