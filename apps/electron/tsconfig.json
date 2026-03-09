@@ -24,9 +24,10 @@
       "@/*": ["src/renderer/*"],
       "@config/*": ["../../packages/shared/src/config/*"],
       "@pmi-agent/shared": ["../../packages/shared/src/index.ts"],
-      "@pmi-agent/shared/*": ["../../packages/shared/src/*"]
+      "@pmi-agent/shared/*": ["../../packages/shared/src/*"],
+      "@pmi-agent/acp-client": ["../../packages/acp-client/src/index.ts"]
     }
   },
-  "include": ["src/**/*", "../../packages/shared/src/**/*.d.ts"],
+  "include": ["src/**/*", "../../packages/shared/src/**/*.d.ts", "../../packages/acp-client/src/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

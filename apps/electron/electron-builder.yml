@@ -36,6 +36,13 @@ files:
 extraMetadata:
   main: dist/main.cjs
 
+# Bundle the .opencode config directory (agents, modes, plugins) into the app
+# so OpenCode can load our custom agents without requiring user-side configuration.
+# Accessed at runtime via OPENCODE_CONFIG_DIR pointing to resources/opencode-config.
+extraResources:
+  - from: ../../.opencode
+    to: opencode-config
+
 # Auto-update: electron-updater fetches from this URL for update manifests (.yml files)
 publish:
   provider: generic

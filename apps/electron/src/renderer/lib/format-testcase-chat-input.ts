@@ -3,7 +3,8 @@
  * chat session from the test case report view.
  */
 import type { TestCase } from '../../shared/types'
-import testcaseChatIntro from '@prompts/testcase-chat-intro.md?raw'
+
+const testcaseChatIntro = 'You are my security testing assistant. Help me execute and refine the following test case.'
 
 export function formatTestCaseChatInput(testCase: TestCase): string {
   const lines: string[] = []

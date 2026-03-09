@@ -47,7 +47,7 @@ export function parseSingleTestCase(block: string): ParsedTestCase | null {
   const guidanceTable = extractTable(block, 'Guidance') ?? extractOrphanStepsTable(block)
   const referenceTable = extractTable(block, 'Reference')
 
-  const guidance = guidanceTable ?? undefined
+  const guidance = guidanceTable ? formatGuidanceTable(guidanceTable) : undefined
 
   const reference = referenceTable
     ? parseReferenceTable(parseMarkdownTable(referenceTable))
@@ -132,12 +132,15 @@ function extractField(text: string, fieldName: string): string | undefined {
 /**
  * Extract a markdown table that follows a **FieldName:** header.
  * Returns the raw table string (header row + separator + data rows).
+ * Stops capturing when it hits a blank line or another **Field:** header.
  */
 function extractTable(text: string, fieldName: string): string | undefined {
-  // Find the field header, then capture the table that follows
+  // Find the field header, then greedily capture contiguous table rows.
+  // Uses [^\n]+ (not .+) so rows never cross newlines, and each row must
+  // end with a newline or end-of-string.  This naturally stops at blank
+  // lines, **Field:** headers, or any non-table content.
   const pattern = new RegExp(
-    `\\*\\*${escapeRegex(fieldName)}\\s*:\\*\\*[^\\n]*\\n((?:\\s*\\|.+\\|\\s*\\n?)+)`,
-    's',
+    `\\*\\*${escapeRegex(fieldName)}\\s*:\\*\\*[^\\n]*\\n((?:[^\\S\\n]*\\|[^\\n]+\\|[^\\S\\n]*(?:\\n|$))*)`,
   )
   const match = text.match(pattern)
   if (!match) return undefined
@@ -254,6 +257,50 @@ function extractOrphanStepsTable(text: string): string | undefined {
   const match = text.match(pattern)
   if (!match) return undefined
   return match[1].trim() || undefined
+}
+
+/**
+ * Preserve the guidance markdown table and escape raw HTML inside cells
+ * so that XSS payloads (e.g. `<script>`, `<img onerror=…>`) render as
+ * visible text rather than being swallowed by rehype-raw.
+ *
+ * Backtick-wrapped code spans are left untouched — they are already safe
+ * because ReactMarkdown renders them as `<code>` with escaped content.
+ */
+function formatGuidanceTable(tableStr: string): string {
+  return tableStr
+    .trim()
+    .split('\n')
+    .map((line) => {
+      // Leave separator rows (|---|---|) untouched
+      if (/^\|[\s\-:|]+\|$/.test(line.trim())) return line
+
+      // For data/header rows, escape HTML inside each cell
+      return line.replace(
+        /\|([^|]*)/g,
+        (_match, cellContent: string) => '|' + escapeHtmlInCell(cellContent),
+      )
+    })
+    .join('\n')
+}
+
+/**
+ * Escape `<`, `>`, and `&` that appear outside of backtick code spans.
+ * Content inside backticks is preserved verbatim.
+ */
+function escapeHtmlInCell(cell: string): string {
+  // Split on backtick-delimited spans, escape only the non-code parts
+  const parts = cell.split(/(`[^`]*`)/g)
+  return parts
+    .map((part, i) => {
+      // Odd indices are backtick-wrapped code spans — leave them alone
+      if (i % 2 === 1) return part
+      return part
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+    })
+    .join('')
 }
 
 function escapeRegex(str: string): string {

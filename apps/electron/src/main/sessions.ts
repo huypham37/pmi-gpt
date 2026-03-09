@@ -791,11 +791,22 @@ export class SessionManager {
       sessionLog.info(`Created temp workspace directory: ${defaultCwd}`)
     }
     
+    // Resolve the bundled opencode config directory (agents, modes, plugins)
+    // In packaged app: lives in app resources as 'opencode-config'
+    // In development: use the repo's .opencode directory directly
+    const opencodeConfigDir = app.isPackaged
+      ? join(process.resourcesPath, 'opencode-config')
+      : join(__dirname, '..', '..', '..', '..', '.opencode')
+
     sessionLog.info(`[STARTUP-DEBUG] Creating ACPClient with cwd: ${defaultCwd}`)
+    sessionLog.info(`[STARTUP-DEBUG] OPENCODE_CONFIG_DIR: ${opencodeConfigDir}`)
     this.acpClient = new ACPClient({
       executable: opencodeExecutable,
       arguments: ['acp'],
       workingDirectory: defaultCwd,
+      environment: {
+        OPENCODE_CONFIG_DIR: opencodeConfigDir,
+      },
       clientInfo: {
         name: 'pmi-agent',
         title: 'PMI Agent',
@@ -1470,6 +1481,10 @@ export class SessionManager {
       // Create a new ACP session (the server owns tools/prompts/behavior)
       managed.acpSession = await this.acpClient.newSession()
 
+      // Log what OpenCode returned from session/new
+      sessionLog.info(`[ACP Session] Available modes: ${JSON.stringify(managed.acpSession.modes.map(m => m.id))}`)
+      sessionLog.info(`[ACP Session] Current mode after session/new: ${managed.acpSession.currentModeId ?? 'none'}`)
+
       // Set model if session has a specific model override
       const resolvedModel = managed.model || config?.model || DEFAULT_MODEL
       sessionLog.info(`[ACP Session] Setting main model — resolved: ${resolvedModel} (session: ${managed.model || 'none'}, config: ${config?.model || 'none'}, default: ${DEFAULT_MODEL})`)
@@ -1484,6 +1499,7 @@ export class SessionManager {
       sessionLog.info(`[ACP Session] Setting mode — resolved: ${resolvedMode} (profile: ${managed.profile || 'none'}, configMode: ${getMode() || 'none'}, fallback: testcase-generator)`)
       try {
         await managed.acpSession.setMode(resolvedMode)
+        sessionLog.info(`[ACP Session] Mode after setMode: ${managed.acpSession.currentModeId ?? 'none'}`)
       } catch (e) {
         sessionLog.warn(`Failed to set mode ${resolvedMode}:`, e)
       }
@@ -2004,7 +2020,7 @@ export class SessionManager {
         const wsConfig = loadWorkspaceConfig(managed.workspace.rootPath)
         const effectiveModel = model ?? wsConfig?.defaults?.model ?? loadStoredConfig()?.model ?? DEFAULT_MODEL
         const resolvedModel = effectiveModel
-        managed.acpSession.setModel(resolvedModel).catch(e => {
+        managed.acpSession.setModel(resolvedModel).catch((e: unknown) => {
           sessionLog.warn(`Failed to set model ${resolvedModel}:`, e)
         })
       }
@@ -2265,7 +2281,7 @@ export class SessionManager {
           if (text) contentBlocks.push({ type: 'resource', resource: { uri: `file://${att.storedPath}`, text } })
         }
       }
-      const updateStream = acpSession.prompt(contentBlocks.length > 1 ? contentBlocks : message)
+      const updateStream = acpSession.prompt(contentBlocks)
 
       for await (const update of updateStream) {
         // Process the ACP update
@@ -2590,18 +2606,18 @@ To view this task's output:
       if (allowed) {
         // Prefer always_allow if alwaysAllow is true, otherwise allow_once
         const targetKind = alwaysAllow ? 'allow_always' : 'allow_once'
-        optionId = options.find(o => o.kind === targetKind)?.optionId
-          ?? options.find(o => o.kind === 'allow_once')?.optionId
+        optionId = options.find((o: { kind: string; optionId: string }) => o.kind === targetKind)?.optionId
+          ?? options.find((o: { kind: string; optionId: string }) => o.kind === 'allow_once')?.optionId
       } else {
-        optionId = options.find(o => o.kind === 'reject_once')?.optionId
-          ?? options.find(o => o.kind === 'reject_always')?.optionId
+        optionId = options.find((o: { kind: string; optionId: string }) => o.kind === 'reject_once')?.optionId
+          ?? options.find((o: { kind: string; optionId: string }) => o.kind === 'reject_always')?.optionId
       }
       if (optionId) {
-        permRequest.respond(optionId).catch(e => {
+        permRequest.respond(optionId).catch((e: unknown) => {
           sessionLog.warn('Failed to respond to ACP permission:', e)
         })
       } else {
-        permRequest.cancel().catch(e => {
+        permRequest.cancel().catch((e: unknown) => {
           sessionLog.warn('Failed to cancel ACP permission:', e)
         })
       }
@@ -2848,7 +2864,7 @@ To view this task's output:
 
       case 'plan': {
         // Render plan entries as a text message
-        const planText = update.entries.map(e => `- [${e.status}] ${e.content}`).join('\n')
+        const planText = update.entries.map((e: { status: string; content: string }) => `- [${e.status}] ${e.content}`).join('\n')
 
         // Flush any pending text first
         this.flushDelta(sessionId, workspaceId)

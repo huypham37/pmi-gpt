@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { ArrowLeft, MessageSquare, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { PanelHeader } from '@/components/app-shell/PanelHeader';
 import { InputContainer } from '@/components/app-shell/input/InputContainer';
 import { TestCaseGrid } from '@/components/testcases/TestCaseGrid';
@@ -66,7 +66,7 @@ export function TestCaseGeneratorPage({
   }, [onOpenChat]);
 
   const handleSubmit = useCallback(async (message: string) => {
-    if (!message.trim() || isGenerating) return;
+    if (!message.trim() || isGenerating || !activeWorkspaceId) return;
 
     setIsGenerating(true);
     setInputValue('');
@@ -114,17 +114,6 @@ export function TestCaseGeneratorPage({
         <>
           <PanelHeader
             title="Test Case Generator"
-            actions={
-              <button
-                onClick={() => handleOpenChat()}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium
-                  text-muted-foreground hover:text-foreground rounded-md
-                  hover:bg-muted/50 transition-colors"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                Chat
-              </button>
-            }
           />
 
           {/* Compact Input at Top */}

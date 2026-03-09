@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import { readFile, rm, mkdir } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join, basename } from 'path'
+import { join as posixJoin } from 'path/posix'
 import { randomUUID } from 'crypto'
 
 export const DOCLING_EXTS = ['pdf', 'docx', 'pptx', 'xlsx', 'html', 'png', 'jpg', 'jpeg', 'webp']
@@ -10,7 +11,7 @@ export const PLAIN_TEXT_EXTS = ['md', 'txt']
 export const ALL_CONTEXT_EXTS = [...DOCLING_EXTS, ...PLAIN_TEXT_EXTS]
 
 export function getOutputMdPath(outDir: string, filePath: string): string {
-  return join(outDir, basename(filePath).replace(/\.[^.]+$/, '.md'))
+  return posixJoin(outDir, basename(filePath).replace(/\.[^.]+$/, '.md'))
 }
 
 export async function extractWithDocling(filePath: string): Promise<string> {

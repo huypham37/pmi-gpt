@@ -156,11 +156,8 @@ describe('buildAugmentedPrompt', () => {
   it('includes test case generation instructions', () => {
     const selection: WSTGSelection = { primary: ENTRY_INPV01, secondary: [] }
     const result = buildAugmentedPrompt('XSS', selection)
-    expect(result).toContain('**Name:**')
-    expect(result).toContain('**Target Component:**')
-    expect(result).toContain('**Guidance:**')
-    expect(result).toContain('**Reference:**')
-    expect(result).toContain('Separate each test case with a single --- on its own line')
+    expect(result).toContain('STRICT ENFORCEMENT')
+    expect(result).toContain('Start your response immediately with the first **Name:** field')
   })
 })
 
@@ -521,7 +518,7 @@ describe('Full flow with project context', () => {
     // Verify prompt structure order: WSTG first, then project context, then instructions
     const wstgPos = prompt.indexOf('### Primary WSTG Reference')
     const contextPos = prompt.indexOf('### Project Context')
-    const instructionPos = prompt.indexOf('STRICT OUTPUT FORMAT')
+    const instructionPos = prompt.indexOf('STRICT ENFORCEMENT')
     expect(wstgPos).toBeLessThan(contextPos)
     expect(contextPos).toBeLessThan(instructionPos)
   })

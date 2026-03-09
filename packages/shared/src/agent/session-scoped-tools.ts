@@ -58,6 +58,7 @@ import type { FolderSourceConfig, LoadedSource } from '../sources/types.ts';
 import { getSourceCredentialManager } from '../sources/index.ts';
 import { inferGoogleServiceFromUrl, inferSlackServiceFromUrl, inferMicrosoftServiceFromUrl, isApiOAuthProvider, type GoogleService, type SlackService, type MicrosoftService } from '../sources/types.ts';
 import { buildAuthorizationHeader } from '../sources/api-tools.ts';
+import { isGoogleOAuthConfigured } from '../auth/google-oauth.ts';
 import { DOC_REFS } from '../docs/index.ts';
 import { renderMermaid } from '@pmi-agent/mermaid';
 import { createLLMTool } from './llm-tool.ts';

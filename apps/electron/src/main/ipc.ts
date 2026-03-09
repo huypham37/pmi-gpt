@@ -2362,19 +2362,34 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     const charCount = augmentedPrompt.length
     const estimatedTokens = Math.ceil(charCount / 4)
     ipcLog.info(`[TestCaseGen] Augmented prompt: ${charCount} chars, ~${estimatedTokens} tokens`)
+    ipcLog.info(`[TestCaseGen] Project context: desc="${projectContext.description?.slice(0, 100) ?? 'NONE'}", docs=${contextDocuments.length} (${contextDocuments.map(d => d.name).join(', ') || 'none'})`)
+
+    // Save full augmented prompt for debugging
+    try {
+      const debugDir = join(process.cwd(), 'debug-output')
+      await mkdir(debugDir, { recursive: true })
+      const slug = attackVector.replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 40)
+      const now2 = new Date()
+      const ts2 = `${String(now2.getMonth() + 1).padStart(2, '0')}${String(now2.getDate()).padStart(2, '0')}-${String(now2.getHours()).padStart(2, '0')}${String(now2.getMinutes()).padStart(2, '0')}`
+      await writeFile(join(debugDir, `${ts2}-PROMPT-${slug}.txt`), augmentedPrompt, 'utf-8')
+      ipcLog.info(`[TestCaseGen] Full prompt saved to debug-output/${ts2}-PROMPT-${slug}.txt`)
+    } catch (err) {
+      ipcLog.warn(`[TestCaseGen] Failed to save prompt: ${err}`)
+    }
 
     // Step 3: Create ACP session and send prompt to OpenCode
     const session = await sessionManager.createSession(workspaceId, {
       profile: 'testcase',
       hidden: true,
     })
+    ipcLog.info(`[TestCaseGen] Session created: id=${session.id}, profile=${session.profile ?? 'none'}`)
 
     await sessionManager.sendMessage(session.id, augmentedPrompt)
 
     // Step 4: Collect the full response from session messages
     const fullSession = await sessionManager.getSession(session.id)
     const assistantMessages = fullSession?.messages
-      .filter((m) => m.type === 'assistant')
+      .filter((m) => m.role === 'assistant')
       .map((m) => typeof m.content === 'string' ? m.content : JSON.stringify(m.content))
       .join('\n') ?? ''
 
@@ -2385,7 +2400,9 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
       const debugDir = join(process.cwd(), 'debug-output')
       await mkdir(debugDir, { recursive: true })
       const slug = attackVector.replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 60)
-      const debugPath = join(debugDir, `${Date.now()}-${slug}.md`)
+      const now = new Date()
+      const ts = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+      const debugPath = join(debugDir, `${ts}-${slug}.md`)
       await writeFile(debugPath, assistantMessages, 'utf-8')
       ipcLog.info(`[TestCaseGen] Debug output saved to ${debugPath}`)
     } catch (err) {

@@ -1,0 +1,168 @@
+name: Pre-ship Validation
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── 1. Unit tests ────────────────────────────────────────────────────────
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run unit tests
+        run: bun test
+
+  # ─── 2. TypeScript typecheck ──────────────────────────────────────────────
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck shared package
+        run: bun run typecheck
+
+      - name: Typecheck electron app
+        working-directory: apps/electron
+        run: bun run typecheck
+
+  # ─── 3. Lint ──────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+  # ─── 4. Validate bundled OpenCode config ─────────────────────────────────
+  # Ensures the .opencode/ directory that ships inside the app bundle is
+  # well-formed: valid JSON config, required agent files present.
+  validate-opencode-config:
+    name: Validate OpenCode Config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check opencode.json exists and is valid JSON
+        run: |
+          CONFIG=".opencode/opencode.json"
+          if [ ! -f "$CONFIG" ]; then
+            echo "ERROR: $CONFIG not found"
+            exit 1
+          fi
+          python3 -c "import json,sys; json.load(open('$CONFIG'))" && echo "OK: $CONFIG is valid JSON"
+
+      - name: Check testcase-generator agent exists
+        run: |
+          AGENT=".opencode/agents/testcase-generator.md"
+          if [ ! -f "$AGENT" ]; then
+            echo "ERROR: $AGENT not found"
+            exit 1
+          fi
+          echo "OK: $AGENT exists"
+
+      - name: Check LM Studio provider is configured
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          with open(".opencode/opencode.json") as f:
+              config = json.load(f)
+          providers = config.get("provider", {})
+          if "lmstudio" not in providers:
+              print("ERROR: lmstudio provider not found in .opencode/opencode.json")
+              sys.exit(1)
+          lm = providers["lmstudio"]
+          base_url = lm.get("options", {}).get("baseURL", "")
+          if not base_url:
+              print("ERROR: lmstudio.options.baseURL is missing")
+              sys.exit(1)
+          print(f"OK: lmstudio provider configured with baseURL={base_url}")
+          EOF
+
+      - name: Check default_agent is set to testcase-generator
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          with open(".opencode/opencode.json") as f:
+              config = json.load(f)
+          default_agent = config.get("default_agent", "")
+          if default_agent != "testcase-generator":
+              print(f"ERROR: default_agent is '{default_agent}', expected 'testcase-generator'")
+              sys.exit(1)
+          print(f"OK: default_agent={default_agent}")
+          EOF
+
+      - name: Check extraResources path in electron-builder.yml
+        run: |
+          python3 - <<'EOF'
+          import sys
+          with open("apps/electron/electron-builder.yml") as f:
+              content = f.read()
+          if "from: ../../.opencode" not in content:
+              print("ERROR: extraResources entry for .opencode not found in electron-builder.yml")
+              sys.exit(1)
+          if "to: opencode-config" not in content:
+              print("ERROR: extraResources destination 'opencode-config' not found in electron-builder.yml")
+              sys.exit(1)
+          print("OK: electron-builder.yml has correct extraResources entry")
+          EOF
+
+      - name: Check OPENCODE_CONFIG_DIR is set in sessions.ts
+        run: |
+          if ! grep -q "OPENCODE_CONFIG_DIR" apps/electron/src/main/sessions.ts; then
+            echo "ERROR: OPENCODE_CONFIG_DIR not found in sessions.ts"
+            exit 1
+          fi
+          if ! grep -q "opencode-config" apps/electron/src/main/sessions.ts; then
+            echo "ERROR: 'opencode-config' resource path not found in sessions.ts"
+            exit 1
+          fi
+          echo "OK: sessions.ts contains OPENCODE_CONFIG_DIR wiring"
+
+  # ─── 5. Electron build ───────────────────────────────────────────────────
+  # Verifies the full Electron app compiles successfully.
+  # Runs on ubuntu only (fastest, no platform-specific packaging needed here).
+  electron-build:
+    name: Electron Build
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, lint, validate-opencode-config]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Electron app
+        run: bun run electron:build

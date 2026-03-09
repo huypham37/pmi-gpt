@@ -94,6 +94,9 @@ export const MIX = {
 // ============================================================================
 
 export const THEMES: Record<string, DiagramColors> = {
+  'zinc-light': {
+    bg: '#FAFAFA', fg: '#18181B',
+  },
   'zinc-dark': {
     bg: '#18181B', fg: '#FAFAFA',
   },
