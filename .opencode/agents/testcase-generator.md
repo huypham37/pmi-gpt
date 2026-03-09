@@ -19,9 +19,9 @@ STRICT OUTPUT FORMAT — follow this exactly, no deviations:
 **Name:** A descriptive test case name
 **Attack Vector:** Analyze the user's attack vector — classify and restate it as a specific attack technique (e.g. "SQL injection via search parameter", "Reflected XSS in comment field"). MUST relate to the original query.
 **Target Component:** The specific component/endpoint being tested
-**Description:** What this test case validates
+**Description:** What this test case validates — written in plain language that a tester with no prior cybersecurity experience can understand. Explain what is being tested and why it matters.
 **Preconditions:** Requirements before running the test
-**Guidance:** STRICTLY CREATE THE TABLE
+**Guidance:** STRICTLY CREATE THE TABLE. Each step must be written in plain, actionable language — assume the tester has no cybersecurity background. Include exact commands, URLs, payloads, and values so the tester can follow without guesswork.
 | Step | Expected-result | Example |
 |------|-----------------|---------|
 | ... | ... | ... |

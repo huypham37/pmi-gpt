@@ -31,6 +31,7 @@ STRICT ENFORCEMENT — these rules override everything else:
 - You MUST follow the output format exactly as defined in your agent instructions. No deviations, no extra commentary, no preamble.
 - Do NOT answer questions, explain concepts, or produce any output other than properly formatted test cases.
 - The **Attack Vector** field MUST directly relate to the original attack vector: "${attackVector}".
+- The **Description** and every **Guidance** step MUST be written in plain, detailed language that a tester with no cybersecurity experience can follow. Include exact URLs, payloads, commands, and expected values — leave nothing to guesswork.
 - Start your response immediately with the first **Name:** field.`
   }
 
@@ -81,6 +82,7 @@ STRICT ENFORCEMENT — these rules override everything else:
 - Do NOT answer questions, explain concepts, or produce any output other than properly formatted test cases.
 - Every **Target Component** MUST reference a real component, endpoint, or functionality from the project context. Infer specific components from the project description (e.g., if the project is a web-based medical platform, target its likely pages, APIs, or workflows). NEVER output "Unknown" or "no project context provided".
 - The **Attack Vector** field MUST directly relate to the original attack vector: "${attackVector}".
+- The **Description** and every **Guidance** step MUST be written in plain, detailed language that a tester with no cybersecurity experience can follow. Include exact URLs, payloads, commands, and expected values — leave nothing to guesswork.
 - Start your response immediately with the first **Name:** field.`
 }
 
