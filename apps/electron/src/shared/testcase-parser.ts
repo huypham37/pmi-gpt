@@ -132,14 +132,15 @@ function extractField(text: string, fieldName: string): string | undefined {
 /**
  * Extract a markdown table that follows a **FieldName:** header.
  * Returns the raw table string (header row + separator + data rows).
+ * Stops capturing when it hits a blank line or another **Field:** header.
  */
 function extractTable(text: string, fieldName: string): string | undefined {
-  // Find the field header, then capture the table that follows.
-  // Use [^\S\n]* (whitespace except newlines) to avoid skipping over
-  // subsequent **Field:** headers when matching consecutive table rows.
+  // Find the field header, then greedily capture contiguous table rows.
+  // Uses [^\n]+ (not .+) so rows never cross newlines, and each row must
+  // end with a newline or end-of-string.  This naturally stops at blank
+  // lines, **Field:** headers, or any non-table content.
   const pattern = new RegExp(
-    `\\*\\*${escapeRegex(fieldName)}\\s*:\\*\\*[^\\n]*\\n((?:[^\\S\\n]*\\|.+\\|[^\\S\\n]*\\n?)+)`,
-    's',
+    `\\*\\*${escapeRegex(fieldName)}\\s*:\\*\\*[^\\n]*\\n((?:[^\\S\\n]*\\|[^\\n]+\\|[^\\S\\n]*(?:\\n|$))*)`,
   )
   const match = text.match(pattern)
   if (!match) return undefined
@@ -259,23 +260,47 @@ function extractOrphanStepsTable(text: string): string | undefined {
 }
 
 /**
- * Convert a guidance markdown table string into human-readable lines.
- * Each row becomes: "Step. Expected: <expected>[ Example: <example>]"
+ * Preserve the guidance markdown table and escape raw HTML inside cells
+ * so that XSS payloads (e.g. `<script>`, `<img onerror=…>`) render as
+ * visible text rather than being swallowed by rehype-raw.
+ *
+ * Backtick-wrapped code spans are left untouched — they are already safe
+ * because ReactMarkdown renders them as `<code>` with escaped content.
  */
 function formatGuidanceTable(tableStr: string): string {
-  const rows = parseMarkdownTable(tableStr)
-  const lines: string[] = []
-  for (const row of rows) {
-    const step = row['step'] ?? ''
-    const expected = row['expected-result'] ?? row['expected_result'] ?? row['expected result'] ?? ''
-    const example = row['example'] ?? ''
-    if (!step) continue
-    let line = step
-    if (expected) line += ` Expected: ${expected}`
-    if (example) line += ` Example: ${example}`
-    lines.push(line)
-  }
-  return lines.join('\n')
+  return tableStr
+    .trim()
+    .split('\n')
+    .map((line) => {
+      // Leave separator rows (|---|---|) untouched
+      if (/^\|[\s\-:|]+\|$/.test(line.trim())) return line
+
+      // For data/header rows, escape HTML inside each cell
+      return line.replace(
+        /\|([^|]*)/g,
+        (_match, cellContent: string) => '|' + escapeHtmlInCell(cellContent),
+      )
+    })
+    .join('\n')
+}
+
+/**
+ * Escape `<`, `>`, and `&` that appear outside of backtick code spans.
+ * Content inside backticks is preserved verbatim.
+ */
+function escapeHtmlInCell(cell: string): string {
+  // Split on backtick-delimited spans, escape only the non-code parts
+  const parts = cell.split(/(`[^`]*`)/g)
+  return parts
+    .map((part, i) => {
+      // Odd indices are backtick-wrapped code spans — leave them alone
+      if (i % 2 === 1) return part
+      return part
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+    })
+    .join('')
 }
 
 function escapeRegex(str: string): string {

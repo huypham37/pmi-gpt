@@ -35,8 +35,10 @@ describe('parseSingleTestCase', () => {
     expect(result!.targetComponent).toBe('Comment body field in POST /api/comments')
     expect(result!.description).toBe('Tests whether the application properly sanitizes basic script tag injections.')
     expect(result!.guidance).toContain('1. Navigate to /comments/new')
-    expect(result!.guidance).toContain('Expected: Page loads')
+    expect(result!.guidance).toContain('Page loads')
     expect(result!.guidance).toContain('2. Enter payload in body')
+    // Guidance should NOT bleed into Reference table
+    expect(result!.guidance).not.toContain('**Reference:**')
     expect(result!.reference).toHaveLength(2)
     expect(result!.reference![0]).toEqual({
       id: 'WSTG-INPV-01',
@@ -108,8 +110,41 @@ describe('parseSingleTestCase', () => {
     const result = parseSingleTestCase(block)
 
     expect(result!.guidance).toContain('Submit form')
-    expect(result!.guidance).toContain('Expected: 200 OK')
-    expect(result!.guidance).toContain('Example: curl -X POST /api')
+    expect(result!.guidance).toContain('200 OK')
+    expect(result!.guidance).toContain('curl -X POST /api')
+  })
+
+  it('escapes HTML payloads in guidance table cells', () => {
+    const block = `
+**Name:** XSS Payload Test
+**Guidance:**
+| Step | Expected-result | Example |
+|------|-----------------|---------|
+| Inject payload | No alert fires | <script>alert(1)</script> |
+| Try img tag | No execution | <img src=x onerror=alert(1)> |
+`
+    const result = parseSingleTestCase(block)
+
+    expect(result!.guidance).not.toContain('<script>')
+    expect(result!.guidance).not.toContain('<img')
+    expect(result!.guidance).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(result!.guidance).toContain('&lt;img src=x onerror=alert(1)&gt;')
+  })
+
+  it('preserves backtick code spans in guidance cells without escaping', () => {
+    const block = `
+**Name:** Code Span Test
+**Guidance:**
+| Step | Expected-result | Example |
+|------|-----------------|---------|
+| Send \`<script>alert(1)</script>\` in input | Payload escaped | Use \`curl -X POST\` |
+`
+    const result = parseSingleTestCase(block)
+
+    // Content inside backticks should NOT be escaped
+    expect(result!.guidance).toContain('`<script>alert(1)</script>`')
+    // Content outside backticks should be escaped
+    expect(result!.guidance).toContain('`curl -X POST`')
   })
 
   it('parses attackVector field', () => {

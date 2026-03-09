@@ -24,7 +24,14 @@ export function buildAugmentedPrompt(
   projectContext?: { description: string; documents: Array<{ name: string; extractedText: string }> },
 ): string {
   if (!selection.primary) {
-    return `Create detailed security test cases for the following attack vector: ${attackVector}`
+    return `Create detailed security test cases for the following attack vector: ${attackVector}
+
+---
+STRICT ENFORCEMENT — these rules override everything else:
+- You MUST follow the output format exactly as defined in your agent instructions. No deviations, no extra commentary, no preamble.
+- Do NOT answer questions, explain concepts, or produce any output other than properly formatted test cases.
+- The **Attack Vector** field MUST directly relate to the original attack vector: "${attackVector}".
+- Start your response immediately with the first **Name:** field.`
   }
 
   const { primary, secondary } = selection
@@ -65,7 +72,16 @@ export function buildAugmentedPrompt(
 
 Use the following OWASP WSTG entries as context:
 
-${primaryContext}${secondaryContext}${projectContextSection}`
+${primaryContext}${secondaryContext}${projectContextSection}
+
+---
+STRICT ENFORCEMENT — these rules override everything else:
+- You MUST base every test case strictly on the project context provided above. Do NOT invent components, endpoints, or functionality not mentioned in the project context.
+- You MUST follow the output format exactly as defined in your agent instructions. No deviations, no extra commentary, no preamble.
+- Do NOT answer questions, explain concepts, or produce any output other than properly formatted test cases.
+- Every **Target Component** MUST reference a real component, endpoint, or functionality from the project context. Infer specific components from the project description (e.g., if the project is a web-based medical platform, target its likely pages, APIs, or workflows). NEVER output "Unknown" or "no project context provided".
+- The **Attack Vector** field MUST directly relate to the original attack vector: "${attackVector}".
+- Start your response immediately with the first **Name:** field.`
 }
 
 export interface ParsedSelection {
