@@ -106,7 +106,10 @@ Write-Host "Downloading Bun $BunVersion for Windows x64 (baseline)..."
 New-Item -ItemType Directory -Force -Path "$ElectronDir\vendor\bun" | Out-Null
 
 $BunDownload = "bun-windows-x64-baseline"
-$TempDir = Join-Path $env:TEMP "bun-download-$(Get-Random)"
+# Resolve TEMP to its long path — $env:TEMP often returns a Windows 8.3 short
+# path (e.g. C:\Users\HUY~1.PHA\...) which causes Remove-Item to fail later.
+$LongTemp = (Get-Item $env:TEMP).FullName
+$TempDir = Join-Path $LongTemp "bun-download-$(Get-Random)"
 New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
 
 try {
@@ -151,12 +154,7 @@ try {
     Write-Host "Waiting for file handles to release..."
     Start-Sleep -Seconds 3
 } finally {
-    # Resolve to long path first — $env:TEMP may return a Windows 8.3 short path
-    # (e.g. C:\Users\HUY~1.PHA\...) that Remove-Item cannot handle.
-    if (Test-Path $TempDir) {
-        $resolvedTemp = (Resolve-Path $TempDir).Path
-        Remove-Item -Recurse -Force $resolvedTemp -ErrorAction SilentlyContinue
-    }
+    Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
 }
 
 # 4. Copy SDK from root node_modules (monorepo hoisting)

@@ -154,14 +154,11 @@ bun run electron:start
 
 ### Pre-Built Binaries
 
+**Windows:** Download the latest installer from [GitHub Releases](https://github.com/huypham37/pmi-gpt/releases/latest).
+
 **macOS:**
 ```bash
 curl -fsSL https://agents.craft.do/install-app.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://agents.craft.do/install-app.ps1 | iex
 ```
 
 **Linux:**

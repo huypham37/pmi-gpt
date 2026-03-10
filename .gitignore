@@ -67,3 +67,6 @@ id_ed25519*
 credentials.enc
 *.credentials
 nul
+
+# OpenCode local config
+.opencode/
