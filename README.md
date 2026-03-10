@@ -256,13 +256,29 @@ bun run lint
 
 ### Model Configuration
 
-Models are configured in `packages/shared/src/config/models.ts`. The default models:
+Models are configured in `config.json`, which is auto-created on first launch:
 
-| Purpose | Model | Provider |
-|---|---|---|
-| Chat (default) | Qwen3 4B | LM Studio |
-| Extraction | GPT-5 Mini | GitHub Copilot |
-| Summarization | GPT-5 Mini | GitHub Copilot |
+- **Windows:** `%LOCALAPPDATA%\pmi-agent\config.json`
+- **macOS/Linux:** `~/.pmi-agent/config.json`
+
+The config file contains:
+- `models` — the list of available models shown in the app settings
+- `model` — the main model for complex tasks (test case generation, chat)
+- `subModel` — the small model for lightweight tasks (WSTG RAG selection)
+
+Example `config.json`:
+```json
+{
+  "models": [
+    { "id": "lmstudio/openai/gpt-oss-20b", "name": "GPT-OSS 20B", "shortName": "GPT-OSS 20B", "description": "Open-source GPT model via LM Studio" },
+    { "id": "lmstudio/qwen3.5-9b", "name": "Qwen3.5 9B", "shortName": "Qwen3.5 9B", "description": "Mid-size reasoning model via LM Studio" }
+  ],
+  "model": "lmstudio/openai/gpt-oss-20b",
+  "subModel": "lmstudio/qwen3.5-9b"
+}
+```
+
+> **For best results**, consider using **GPT-OSS 20B** for the main model and **Qwen3.5 9B** for the sub-model.
 
 ### Environment Variables
 

@@ -19,6 +19,7 @@ import { CONFIG_DIR } from './paths.ts';
 import type { StoredAttachment, StoredMessage } from '@pmi-agent/core/types';
 import type { Plan } from '../agent/plan-types.ts';
 import { BUNDLED_CONFIG_DEFAULTS, type ConfigDefaults } from './config-defaults-schema.ts';
+import { DEFAULT_MODELS } from './models.ts';
 
 // Re-export CONFIG_DIR for convenience (centralized in paths.ts)
 export { CONFIG_DIR } from './paths.ts';
@@ -41,6 +42,7 @@ export interface StoredConfig {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
   activeSessionId: string | null;
+  models?: Array<{ id: string; name: string; shortName: string; description: string; contextWindow?: number }>;
   model?: string;
   subModel?: string;
   mode?: string;
@@ -173,6 +175,11 @@ export function saveConfig(config: StoredConfig): void {
   };
 
   writeFileSync(CONFIG_FILE, JSON.stringify(storageConfig, null, 2), 'utf-8');
+}
+
+export function getModels(): Array<{ id: string; name: string; shortName: string; description: string; contextWindow?: number }> {
+  const config = loadStoredConfig();
+  return config?.models ?? [];
 }
 
 export function getModel(): string | null {
@@ -561,6 +568,7 @@ export function ensureDefaultWorkspace(): Workspace {
       workspaces: [],
       activeWorkspaceId: null,
       activeSessionId: null,
+      models: DEFAULT_MODELS,
     };
     saveConfig(config);
   }

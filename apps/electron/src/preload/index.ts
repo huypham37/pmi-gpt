@@ -184,6 +184,7 @@ const api: ElectronAPI = {
   setMode: (mode: string | null) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_MODE, mode),
 
   // Settings - Model (global default)
+  getModels: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_MODELS),
   getModel: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_MODEL),
   setModel: (model: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_MODEL, model),
   // Session-specific model (overrides global)

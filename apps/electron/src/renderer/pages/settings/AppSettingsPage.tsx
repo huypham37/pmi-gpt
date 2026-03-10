@@ -19,7 +19,7 @@ import { HeaderMenu } from '@/components/ui/HeaderMenu'
 import { routes } from '@/lib/navigate'
 import { Spinner } from '@pmi-agent/ui'
 import type { DetailsPageMeta } from '@/lib/navigation-registry'
-import { MODELS, DEFAULT_MODEL } from '@pmi-agent/shared/config/models'
+import { DEFAULT_MODEL } from '@pmi-agent/shared/config/models'
 
 import {
   SettingsSection,
@@ -40,8 +40,9 @@ export const meta: DetailsPageMeta = {
 // ============================================
 
 export default function AppSettingsPage() {
-  // Model state — uses client-side lookup table, not server fetch
+  // Model state — fetched from config defaults
   const [currentModel, setCurrentModel] = useState<string>(DEFAULT_MODEL)
+  const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([])
 
   // Notifications state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
@@ -68,6 +69,13 @@ export default function AppSettingsPage() {
       .then(setNotificationsEnabled)
       .catch((error: unknown) => console.error('Failed to load notification settings:', error))
 
+    // Load available models from config defaults
+    window.electronAPI.getModels()
+      .then((models) => {
+        setModelOptions(models.map(m => ({ value: m.id, label: m.name })))
+      })
+      .catch((error: unknown) => console.error('[AppSettings] Failed to load models:', error))
+
     // Load current model from storage
     window.electronAPI.getModel()
       .then((model) => {
@@ -85,9 +93,6 @@ export default function AppSettingsPage() {
     setCurrentModel(modelId)
     await window.electronAPI.setModel(modelId)
   }, [])
-
-  // Build model options from client-side lookup table
-  const modelOptions = MODELS.map(m => ({ value: m.id, label: m.name }))
 
   return (
     <div className="h-full flex flex-col">

@@ -13,10 +13,11 @@ export interface ModelDefinition {
 }
 
 // ============================================
-// USER-SELECTABLE MODELS (shown in UI)
+// DEFAULT MODELS (seeded into config.json on first run)
+// The user-selectable model list lives in config.json (single source of truth).
 // ============================================
 
-export const MODELS: ModelDefinition[] = [
+export const DEFAULT_MODELS: ModelDefinition[] = [
   { id: 'github-copilot/gpt-5-mini', name: 'GPT-5 Mini', shortName: 'GPT-5 Mini', description: 'Fast & efficient', contextWindow: 128000 },
   { id: 'lmstudio/openai/gpt-oss-20b', name: 'GPT-OSS 20B', shortName: 'GPT-OSS 20B', description: 'Open-source GPT model via LM Studio' },
   { id: 'lmstudio/qwen3-coder-next', name: 'Qwen3 Coder Next', shortName: 'Qwen3 Coder', description: 'Coding-optimized Qwen model via LM Studio' },
@@ -49,7 +50,7 @@ export const INSTRUCTION_UPDATE_MODEL = 'github-copilot/gpt-5-mini';
 
 /** Get display name for a model ID (full name with version) */
 export function getModelDisplayName(modelId: string): string {
-  const model = MODELS.find(m => m.id === modelId);
+  const model = DEFAULT_MODELS.find(m => m.id === modelId);
   if (model) return model.name;
   // For provider-prefixed IDs (e.g. "github-copilot/gpt-5-mini"), show the model part
   if (modelId.includes('/')) {
@@ -60,7 +61,7 @@ export function getModelDisplayName(modelId: string): string {
 
 /** Get short display name for a model ID (without version number) */
 export function getModelShortName(modelId: string): string {
-  const model = MODELS.find(m => m.id === modelId);
+  const model = DEFAULT_MODELS.find(m => m.id === modelId);
   if (model) return model.shortName;
   // For provider-prefixed IDs (e.g. "openai/gpt-5"), show just the model part
   if (modelId.includes('/')) {
@@ -72,7 +73,7 @@ export function getModelShortName(modelId: string): string {
 
 /** Get known context window size for a model ID (fallback when SDK hasn't reported usage yet) */
 export function getModelContextWindow(modelId: string): number | undefined {
-  return MODELS.find(m => m.id === modelId)?.contextWindow;
+  return DEFAULT_MODELS.find(m => m.id === modelId)?.contextWindow;
 }
 
 /** Check if model is an Opus model (for cache TTL decisions) */

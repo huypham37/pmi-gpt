@@ -796,6 +796,7 @@ export const IPC_CHANNELS = {
   SETTINGS_GET_MODE: 'settings:getMode',
   SETTINGS_SET_MODE: 'settings:setMode',
   // Settings - Model
+  SETTINGS_GET_MODELS: 'settings:getModels',
   SETTINGS_GET_MODEL: 'settings:getModel',
   SETTINGS_SET_MODEL: 'settings:setModel',
   SESSION_GET_MODEL: 'session:getModel',
@@ -1086,6 +1087,7 @@ export interface ElectronAPI {
   getMode(): Promise<string | null>
   setMode(mode: string | null): Promise<void>
   // Settings - Model (global default)
+  getModels(): Promise<Array<{ id: string; name: string; shortName: string; description: string; contextWindow?: number }>>
   getModel(): Promise<string | null>
   setModel(model: string): Promise<void>
   // Session-specific model (overrides global)

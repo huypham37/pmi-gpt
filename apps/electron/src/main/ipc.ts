@@ -11,7 +11,7 @@ import { WindowManager } from './window-manager'
 import { registerOnboardingHandlers } from './onboarding'
 import { IPC_CHANNELS, type FileAttachment, type StoredAttachment, type SendMessageOptions } from '../shared/types'
 import { readFileAttachment, perf, validateImageForClaudeAPI, IMAGE_LIMITS } from '@pmi-agent/shared/utils'
-import { getPreferencesPath, getModel, setModel, getMode, setMode, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, addWorkspace, setActiveWorkspace, loadStoredConfig, saveConfig, type Workspace } from '@pmi-agent/shared/config'
+import { getPreferencesPath, getModels, getModel, setModel, getMode, setMode, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, addWorkspace, setActiveWorkspace, loadStoredConfig, saveConfig, type Workspace } from '@pmi-agent/shared/config'
 import { getSessionAttachmentsPath, validateSessionId } from '@pmi-agent/shared/sessions'
 import { loadWorkspaceSources, getSourcesBySlugs, type LoadedSource } from '@pmi-agent/shared/sources'
 import { isValidThinkingLevel } from '@pmi-agent/shared/agent/thinking-levels'
@@ -1187,6 +1187,11 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
   // ============================================================
   // Settings - Model (Global Default)
   // ============================================================
+
+  // Get available models from config.json
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_MODELS, async () => {
+    return getModels()
+  })
 
   // Get global default model
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_MODEL, async (): Promise<string | null> => {

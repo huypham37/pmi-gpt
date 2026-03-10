@@ -1,6 +1,6 @@
 {
   "name": "@pmi-agent/electron",
-  "version": "0.3.2",
+  "version": "1.0.1",
   "description": "Electron desktop app for PMI Agent",
   "main": "dist/main.cjs",
   "private": true,
